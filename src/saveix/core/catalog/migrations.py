@@ -79,6 +79,10 @@ MIGRATIONS: list[str] = [
     ALTER TABLE snapshots ADD COLUMN health TEXT;
     ALTER TABLE snapshots ADD COLUMN health_notes TEXT NOT NULL DEFAULT '[]';
     """,
+    # 9: snapshots the user wants to keep forever
+    """
+    ALTER TABLE snapshots ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 

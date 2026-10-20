@@ -82,6 +82,7 @@ class Snapshot:
     health: str | None = None
     """"ok" or "suspicious" once checked."""
     health_notes: list[str] = field(default_factory=list)
+    pinned: bool = False
 
 
 @dataclass

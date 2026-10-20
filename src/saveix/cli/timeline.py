@@ -26,6 +26,8 @@ def timeline(
         snap = entry.snapshot
         when = entry.local_time.strftime("%Y-%m-%d %H:%M")
         label = f'"{entry.label}"' if entry.custom_label else entry.label
+        if snap.pinned:
+            label += " (pinned)"
         typer.echo(
             f"{HEALTH_MARKS.get(snap.health, ' ')} #{snap.id:<5} {when}  {label:<24} "
             f"{snap.file_count} files, {human_size(snap.total_size)}"
@@ -84,3 +86,17 @@ def check(snapshot_id: int) -> None:
     typer.echo(f"⚠ Snapshot #{snap.id} looks damaged:")
     for problem in snap.health_notes:
         typer.echo(f"  {problem}")
+
+
+def pin(snapshot_id: int) -> None:
+    """Keep a snapshot forever, whatever the retention rules say."""
+    with open_catalog() as catalog:
+        catalog.set_pinned(snapshot_id, True)
+    typer.echo(f"Snapshot #{snapshot_id} is pinned and will never be removed automatically.")
+
+
+def unpin(snapshot_id: int) -> None:
+    """Let the retention rules manage a snapshot again."""
+    with open_catalog() as catalog:
+        catalog.set_pinned(snapshot_id, False)
+    typer.echo(f"Snapshot #{snapshot_id} is no longer pinned.")

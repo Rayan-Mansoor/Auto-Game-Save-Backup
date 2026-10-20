@@ -250,6 +250,7 @@ class Catalog:
             session_id=row["session_id"],
             health=row["health"],
             health_notes=json.loads(row["health_notes"]),
+            pinned=bool(row["pinned"]),
         )
 
     def set_label(self, snapshot_id: int, label: str | None) -> Snapshot:
@@ -262,6 +263,11 @@ class Catalog:
         value = (value or "").strip() or None
         self.get_snapshot(snapshot_id)
         self.db.execute(f"UPDATE snapshots SET {column} = ? WHERE id = ?", (value, snapshot_id))
+        return self.get_snapshot(snapshot_id)
+
+    def set_pinned(self, snapshot_id: int, pinned: bool) -> Snapshot:
+        self.get_snapshot(snapshot_id)
+        self.db.execute("UPDATE snapshots SET pinned = ? WHERE id = ?", (int(pinned), snapshot_id))
         return self.get_snapshot(snapshot_id)
 
     def set_health(self, snapshot_id: int, health: str, notes: list[str]) -> Snapshot:
