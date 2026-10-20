@@ -40,3 +40,33 @@ class Game:
     name: str
     id: int | None = None
     sources: list[Source] = field(default_factory=list)
+
+
+class Trigger(StrEnum):
+    MANUAL = "manual"
+    CHECKPOINT = "checkpoint"
+    SESSION_END = "session_end"
+    SAFETY = "safety"
+
+
+@dataclass(frozen=True)
+class SnapshotFile:
+    source_id: int | None
+    source_path: str
+    template: str
+    digest: str
+    size: int
+    mtime_ns: int
+
+
+@dataclass
+class Snapshot:
+    id: int
+    game_id: int
+    created_at: str
+    trigger: Trigger
+    file_count: int
+    total_size: int
+    fingerprint: str
+    label: str | None = None
+    note: str | None = None

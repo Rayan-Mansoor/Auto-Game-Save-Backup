@@ -7,7 +7,15 @@ import sqlite3
 from pathlib import Path
 
 from saveix.core.catalog import migrations
-from saveix.core.models import Game, Source, SourceKind, SourceRole
+from saveix.core.models import (
+    Game,
+    Snapshot,
+    SnapshotFile,
+    Source,
+    SourceKind,
+    SourceRole,
+    Trigger,
+)
 
 
 class CatalogError(Exception):
@@ -112,3 +120,100 @@ class Catalog:
             )
             for row in rows
         ]
+
+    # snapshots
+
+    def add_snapshot(
+        self,
+        game: Game,
+        trigger: Trigger,
+        created_at: str,
+        fingerprint: str,
+        files: list[SnapshotFile],
+    ) -> Snapshot:
+        self.db.execute("BEGIN")
+        try:
+            cur = self.db.execute(
+                "INSERT INTO snapshots"
+                " (game_id, created_at, trigger, file_count, total_size, fingerprint)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    game.id,
+                    created_at,
+                    trigger.value,
+                    len(files),
+                    sum(f.size for f in files),
+                    fingerprint,
+                ),
+            )
+            snapshot_id = cur.lastrowid
+            self.db.executemany(
+                "INSERT INTO snapshot_files"
+                " (snapshot_id, source_id, source_path, template, digest, size, mtime_ns)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        snapshot_id,
+                        f.source_id,
+                        f.source_path,
+                        f.template,
+                        f.digest,
+                        f.size,
+                        f.mtime_ns,
+                    )
+                    for f in files
+                ],
+            )
+            self.db.execute("COMMIT")
+        except BaseException:
+            self.db.execute("ROLLBACK")
+            raise
+        return self.get_snapshot(snapshot_id)
+
+    def get_snapshot(self, snapshot_id: int) -> Snapshot:
+        row = self.db.execute("SELECT * FROM snapshots WHERE id = ?", (snapshot_id,)).fetchone()
+        if row is None:
+            raise CatalogError(f"No snapshot #{snapshot_id}")
+        return self._snapshot(row)
+
+    def snapshots(self, game: Game) -> list[Snapshot]:
+        rows = self.db.execute(
+            "SELECT * FROM snapshots WHERE game_id = ? ORDER BY id", (game.id,)
+        ).fetchall()
+        return [self._snapshot(row) for row in rows]
+
+    def latest_snapshot(self, game: Game) -> Snapshot | None:
+        row = self.db.execute(
+            "SELECT * FROM snapshots WHERE game_id = ? ORDER BY id DESC LIMIT 1", (game.id,)
+        ).fetchone()
+        return self._snapshot(row) if row else None
+
+    def snapshot_files(self, snapshot_id: int) -> list[SnapshotFile]:
+        rows = self.db.execute(
+            "SELECT * FROM snapshot_files WHERE snapshot_id = ? ORDER BY template", (snapshot_id,)
+        ).fetchall()
+        return [
+            SnapshotFile(
+                source_id=row["source_id"],
+                source_path=row["source_path"],
+                template=row["template"],
+                digest=row["digest"],
+                size=row["size"],
+                mtime_ns=row["mtime_ns"],
+            )
+            for row in rows
+        ]
+
+    @staticmethod
+    def _snapshot(row: sqlite3.Row) -> Snapshot:
+        return Snapshot(
+            id=row["id"],
+            game_id=row["game_id"],
+            created_at=row["created_at"],
+            trigger=Trigger(row["trigger"]),
+            file_count=row["file_count"],
+            total_size=row["total_size"],
+            fingerprint=row["fingerprint"],
+            label=row["label"],
+            note=row["note"],
+        )
