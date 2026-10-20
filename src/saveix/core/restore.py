@@ -75,11 +75,21 @@ class Restorer:
         snapshot: Snapshot,
         context: PathContext,
         remove_extra: bool = True,
+        only_sources: set[int] | None = None,
     ) -> RestorePlan:
+        """Work out what restoring would change; ``only_sources`` limits it to some sources."""
         if snapshot.game_id != game.id:
             raise CatalogError(f"Snapshot #{snapshot.id} does not belong to {game.name}")
+        if only_sources:
+            unknown = only_sources - {s.id for s in game.sources}
+            if unknown:
+                raise CatalogError(f"{game.name} has no source with id {min(unknown)}")
         plan = RestorePlan(game, snapshot)
-        wanted = self.catalog.snapshot_files(snapshot.id)
+        wanted = [
+            entry
+            for entry in self.catalog.snapshot_files(snapshot.id)
+            if not only_sources or entry.source_id in only_sources
+        ]
         current = {}
         for scan in scan_game(game, context):
             for found in scan.files:
@@ -99,6 +109,8 @@ class Restorer:
             wanted_templates = {e.template for e in wanted}
             for template, found in sorted(current.items()):
                 source = next(s for s in game.sources if s.id == found.source_id)
+                if only_sources and source.id not in only_sources:
+                    continue
                 if template not in wanted_templates and source.path in restored_sources:
                     plan.files.append(PlannedFile(Action.DELETE, template, found.path))
         return plan

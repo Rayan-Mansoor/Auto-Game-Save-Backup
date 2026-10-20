@@ -15,6 +15,9 @@ def restore(
     snapshot: int | None = typer.Option(
         None, "--snapshot", "-s", help="Snapshot to restore; defaults to the latest."
     ),
+    source: list[int] = typer.Option(
+        [], "--source", "-S", help="Only restore this source (see `game show`); repeatable."
+    ),
     keep_extra: bool = typer.Option(
         False, help="Keep save files that did not exist in that snapshot."
     ),
@@ -34,7 +37,9 @@ def restore(
             chosen = catalog.get_snapshot(snapshot)
         store = ObjectStore(config.backup_root)
         restorer = Restorer(catalog, store, BackupEngine(catalog, store))
-        plan = restorer.plan(target, chosen, context, remove_extra=not keep_extra)
+        plan = restorer.plan(
+            target, chosen, context, remove_extra=not keep_extra, only_sources=set(source)
+        )
 
         if not plan.has_changes:
             typer.echo(f"{target.name}'s saves already match snapshot #{chosen.id}.")

@@ -139,3 +139,29 @@ def test_restore_command(saves):
     assert (saves / "slot.sav").read_bytes() == b"stage 1"
     assert "Current saves kept as snapshot #2." in result.output
     assert "already match" in runner.invoke(app, ["restore", "G", "-s", "1"]).output
+
+
+def test_restore_single_source(env, saves, context, fake_home):
+    catalog, game, restorer, snap = env
+    cfg = fake_home / "Documents" / "G.ini"
+    write(cfg, b"cfg 1", 1)
+    config_source = catalog.add_source(game, Source(SourceKind.FILE, "<documents>/G.ini"))
+    first = snap(**{"slot.sav": (b"1", 1)})
+    write(cfg, b"cfg 2", 2)
+    snap(**{"slot.sav": (b"2", 2), "extra.sav": (b"x", 2)})
+
+    plan = restorer.plan(game, first, context, only_sources={config_source.id})
+    assert [(f.action, f.template) for f in plan.files] == [(Action.WRITE, "<documents>/G.ini")]
+    restorer.execute(plan, context)
+    assert cfg.read_bytes() == b"cfg 1"
+    assert (saves / "slot.sav").read_bytes() == b"2"
+    assert (saves / "extra.sav").exists()
+
+
+def test_restore_unknown_source(env, context):
+    from saveix.core.catalog import CatalogError
+
+    catalog, game, restorer, snap = env
+    first = snap(**{"slot.sav": (b"1", 1)})
+    with pytest.raises(CatalogError):
+        restorer.plan(game, first, context, only_sources={99})
