@@ -8,6 +8,7 @@ from saveix.cli.common import fail, open_catalog
 from saveix.core.models import Game, Source, SourceKind, SourceRole
 from saveix.core.paths import PathContext
 from saveix.core.sources import SourceError, breadth_problem, guess_kind, to_template
+from saveix.core.sources.registry import RegistryError, is_registry_path, normalize_key
 
 game_app = typer.Typer(help="Manage the games saveix backs up.", no_args_is_help=True)
 source_app = typer.Typer(help="Manage where a game keeps its saves.", no_args_is_help=True)
@@ -70,7 +71,9 @@ def game_remove(
 @source_app.command("add")
 def source_add(
     game: str,
-    path: str = typer.Argument(..., help="Folder, file, glob pattern or placeholder template."),
+    path: str = typer.Argument(
+        ..., help="Folder, file, glob pattern, placeholder template or HKCU registry key."
+    ),
     kind: SourceKind | None = typer.Option(None, help="Detected from the path if omitted."),
     role: SourceRole = typer.Option(SourceRole.SAVE),
     include: list[str] = typer.Option([], help="Only back up files matching this pattern."),
@@ -78,15 +81,20 @@ def source_add(
     force: bool = typer.Option(False, help="Add even if the path looks too broad."),
 ) -> None:
     """Add a save location to a game."""
-    context = PathContext.for_system()
-    template = to_template(path, context)
-    if kind is None:
+    if kind is SourceKind.REGISTRY or (kind is None and is_registry_path(path)):
+        kind = SourceKind.REGISTRY
         try:
-            kind = guess_kind(context.expand(template))
-        except SourceError as exc:
+            template = normalize_key(path)
+        except RegistryError as exc:
             fail(str(exc))
-    if kind is SourceKind.REGISTRY:
-        fail("Registry sources are not supported yet")
+    else:
+        context = PathContext.for_system()
+        template = to_template(path, context)
+        if kind is None:
+            try:
+                kind = guess_kind(context.expand(template))
+            except SourceError as exc:
+                fail(str(exc))
     problem = breadth_problem(template)
     if problem and not force:
         fail(f"{problem}. Use --force to add it anyway.")

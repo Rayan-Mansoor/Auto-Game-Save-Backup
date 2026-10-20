@@ -11,16 +11,20 @@ from pathlib import Path
 
 from saveix.core.models import Game, Source, SourceKind
 from saveix.core.paths import PathContext, UnresolvedPlaceholderError, normalize
+from saveix.core.sources import registry as reg
 
 
 @dataclass(frozen=True)
 class FoundFile:
     source_id: int
-    path: Path
+    path: Path | None
+    """The file on disk; None for a registry key."""
     size: int
     mtime_ns: int
     template: str
     """Where the file lives, as a portable template; the key used for restoring."""
+    data: bytes | None = None
+    """The captured content of a registry key."""
 
 
 @dataclass
@@ -80,11 +84,26 @@ def glob_pattern(source: Source, context: PathContext) -> str:
     return glob.escape(marked).replace(_USER_SENTINEL, user)
 
 
-def scan_source(source: Source, context: PathContext) -> SourceScan:
+def scan_registry(source: Source, registry: reg.RegistryBackend) -> SourceScan:
     result = SourceScan(source)
-    if source.kind is SourceKind.REGISTRY:
-        result.error = "registry sources are not supported yet"
+    try:
+        tree = registry.read_tree(source.path)
+    except (reg.RegistryError, OSError) as exc:
+        result.error = str(exc)
         return result
+    if tree is not None:
+        data = reg.serialize(tree)
+        template = reg.template_for(source.path)
+        result.files.append(FoundFile(source.id, None, len(data), 0, template, data=data))
+    return result
+
+
+def scan_source(
+    source: Source, context: PathContext, registry: reg.RegistryBackend | None = None
+) -> SourceScan:
+    if source.kind is SourceKind.REGISTRY:
+        return scan_registry(source, registry or reg.system_registry())
+    result = SourceScan(source)
     try:
         pattern = glob_pattern(source, context)
     except UnresolvedPlaceholderError as exc:
@@ -107,5 +126,7 @@ def scan_source(source: Source, context: PathContext) -> SourceScan:
     return result
 
 
-def scan_game(game: Game, context: PathContext) -> list[SourceScan]:
-    return [scan_source(source, context) for source in game.sources]
+def scan_game(
+    game: Game, context: PathContext, registry: reg.RegistryBackend | None = None
+) -> list[SourceScan]:
+    return [scan_source(source, context, registry) for source in game.sources]

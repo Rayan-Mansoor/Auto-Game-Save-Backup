@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from saveix.core.catalog import Catalog
 from saveix.core.models import Game, Snapshot, SnapshotFile, Trigger
 from saveix.core.paths import PathContext
+from saveix.core.sources.registry import RegistryBackend, system_registry
 from saveix.core.sources.resolve import FoundFile, scan_game
 from saveix.core.store import ObjectStore
 
@@ -56,9 +57,11 @@ class BackupEngine:
         store: ObjectStore,
         clock: Callable[[], str] = utc_now,
         retry_delay: float = 0.5,
+        registry: RegistryBackend | None = None,
     ) -> None:
         self.catalog = catalog
         self.store = store
+        self.registry = registry or system_registry()
         self.clock = clock
         self.retry_delay = retry_delay
 
@@ -70,7 +73,7 @@ class BackupEngine:
 
         result = BackupResult(snapshot=None, previous=previous)
         captured: list[SnapshotFile] = []
-        for scan in scan_game(game, context):
+        for scan in scan_game(game, context, self.registry):
             if scan.error:
                 result.source_errors.append((scan.source.path, scan.error))
             for found in scan.files:
@@ -93,6 +96,12 @@ class BackupEngine:
         known: SnapshotFile | None,
         result: BackupResult,
     ) -> SnapshotFile | None:
+        if found.data is not None:
+            digest, size = self.store.put_bytes(found.data)
+            if known is None or known.digest != digest:
+                result.changed_files += 1
+            return SnapshotFile(found.source_id, source_path, found.template, digest, size, 0)
+
         # A file with the same size and modification time as last time is not re-read.
         if (
             known

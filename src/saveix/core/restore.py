@@ -12,6 +12,7 @@ from saveix.core.backup import BackupEngine, NothingToBackUpError
 from saveix.core.catalog import Catalog, CatalogError
 from saveix.core.models import Game, Snapshot, SnapshotFile, Trigger
 from saveix.core.paths import PathContext
+from saveix.core.sources import registry as reg
 from saveix.core.sources.resolve import scan_game
 from saveix.core.store import CorruptObjectError, ObjectStore
 
@@ -26,7 +27,8 @@ class Action(StrEnum):
 class PlannedFile:
     action: Action
     template: str
-    path: Path
+    path: Path | None
+    """The file to change; None for a registry key."""
     entry: SnapshotFile | None = None
 
 
@@ -91,14 +93,18 @@ class Restorer:
             if not only_sources or entry.source_id in only_sources
         ]
         current = {}
-        for scan in scan_game(game, context):
+        for scan in scan_game(game, context, self.engine.registry):
             for found in scan.files:
                 current[found.template] = found
 
         for entry in wanted:
-            path = Path(context.expand(entry.template))
             found = current.get(entry.template)
-            same = found and found.size == entry.size and _digest_of(path) == entry.digest
+            if reg.key_from_template(entry.template):
+                path = None
+                same = found and hashlib.sha256(found.data).hexdigest() == entry.digest
+            else:
+                path = Path(context.expand(entry.template))
+                same = found and found.size == entry.size and _digest_of(path) == entry.digest
             plan.files.append(
                 PlannedFile(Action.KEEP if same else Action.WRITE, entry.template, path, entry)
             )
@@ -132,11 +138,20 @@ class Restorer:
                 pass
 
         result = RestoreResult(plan, safety)
+        registry = self.engine.registry
         for item in plan.of(Action.WRITE):
-            self.store.write_to(item.entry.digest, item.path)
-            os.utime(item.path, ns=(item.entry.mtime_ns, item.entry.mtime_ns))
+            key = reg.key_from_template(item.template)
+            if key:
+                registry.write_tree(key, reg.deserialize(self.store.read_bytes(item.entry.digest)))
+            else:
+                self.store.write_to(item.entry.digest, item.path)
+                os.utime(item.path, ns=(item.entry.mtime_ns, item.entry.mtime_ns))
             result.written += 1
         for item in plan.of(Action.DELETE):
-            item.path.unlink(missing_ok=True)
+            key = reg.key_from_template(item.template)
+            if key:
+                registry.delete_tree(key)
+            else:
+                item.path.unlink(missing_ok=True)
             result.deleted += 1
         return result
