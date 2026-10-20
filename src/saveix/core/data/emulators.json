@@ -1,0 +1,13 @@
+{
+  "_comment": "Where Steam emulators keep a game's Steam Cloud ('remote') files. {appid} is the game's Steam app ID. Locations are community-reported; entries with verified=false still need confirming on a real install. Users can add more in emulators.json in the saveix config folder.",
+  "emulators": [
+    {"name": "Goldberg", "remote": "<appdata>/Goldberg SteamEmu Saves/{appid}/remote", "verified": false},
+    {"name": "GSE (Goldberg fork)", "remote": "<appdata>/GSE Saves/{appid}/remote", "verified": false},
+    {"name": "CODEX", "remote": "<public>/Documents/Steam/CODEX/{appid}/remote", "verified": false},
+    {"name": "RUNE", "remote": "<public>/Documents/Steam/RUNE/{appid}/remote", "verified": false},
+    {"name": "EMPRESS", "remote": "<appdata>/EMPRESS/{appid}/remote", "verified": false},
+    {"name": "OnlineFix", "remote": "<public>/Documents/OnlineFix/{appid}/Saves", "verified": false},
+    {"name": "SmartSteamEmu", "remote": "<appdata>/SmartSteamEmu/{appid}/remote", "verified": false},
+    {"name": "FLT", "remote": "<localappdata>/FLT/Steam/{appid}/remote", "verified": false}
+  ]
+}
