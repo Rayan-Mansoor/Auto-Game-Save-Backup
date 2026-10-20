@@ -145,6 +145,9 @@ def suggest(
                 except CatalogError as exc:
                     typer.echo(f"  {exc}")
 
+        if not target.install_dir and details.install_dir:
+            catalog.set_install_dir(target, details.install_dir)
+            typer.echo(f"Installed in {details.install_dir}")
         if not target.steam_app_id and not target.gog_id:
             catalog.set_store_ids(target, match.steam_app_id, match.gog_id)
         if not target.executables and details.executables:

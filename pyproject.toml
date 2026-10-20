@@ -19,6 +19,7 @@ saveix = "saveix.cli:app"
 
 [project.entry-points."saveix.providers"]
 ludusavi = "saveix.integrations.ludusavi:create"
+launchers = "saveix.integrations.launchers:create"
 
 [project.optional-dependencies]
 ludusavi = [

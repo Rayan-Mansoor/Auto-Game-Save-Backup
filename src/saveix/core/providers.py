@@ -52,6 +52,8 @@ class GameDetails:
     sources: list[SourceCandidate] = field(default_factory=list)
     executables: list[str] = field(default_factory=list)
     cloud_sync: bool | None = None
+    install_dir: str | None = None
+    """Where the game is installed on this PC, if the provider knows."""
 
 
 @dataclass(frozen=True)
