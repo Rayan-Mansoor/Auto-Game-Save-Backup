@@ -13,6 +13,7 @@ from saveix.cli import (
     emulators,
     games,
     identify,
+    providers,
     prune,
     restore,
     run,
@@ -26,6 +27,7 @@ app = typer.Typer(
 app.add_typer(config_cmd.app, name="config")
 app.add_typer(games.game_app, name="game")
 app.add_typer(games.source_app, name="source")
+app.add_typer(providers.app, name="providers")
 app.command()(scan.scan)
 app.command()(backup.backup)
 app.command()(timeline.timeline)
@@ -41,6 +43,7 @@ app.command()(emulators.emulators)
 app.command()(run.run)
 app.command()(prune.prune)
 app.command()(detect.detect)
+app.command()(providers.search)
 
 
 def _version_callback(value: bool) -> None:
