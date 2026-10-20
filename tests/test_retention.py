@@ -140,3 +140,43 @@ def test_prune_command_respects_keep_all(fake_home):
     assert "nothing is ever removed" in runner.invoke(app, ["prune"]).output
     runner.invoke(app, ["config", "set", "keep_all_snapshots", "false"])
     assert "Removed 0 snapshots." in runner.invoke(app, ["prune"]).output
+
+
+def test_long_history_stays_small_and_useful(tmp_path):
+    """50 sessions with frequent autosaves, played on dozens of days over several months."""
+    from datetime import timedelta
+
+    with Catalog(tmp_path / "c.sqlite3") as catalog:
+        game = catalog.add_game("G")
+        start = datetime(2026, 1, 1, 18, tzinfo=UTC)
+        day = start
+        for n in range(50):
+            if n % 10 not in (3, 7):  # some evenings have two sessions
+                day += timedelta(days=1 + (n % 4) * 2)
+            session = catalog.start_session(game, day.isoformat())
+            for c in range(12):
+                at = (day + timedelta(minutes=10 * c + n % 2 * 300)).isoformat()
+                snapshot = catalog.add_snapshot(
+                    game, Trigger.CHECKPOINT, at, f"{n}-{c}", [], session.id
+                )
+                catalog.set_health(snapshot.id, "ok", [])
+            catalog.end_session(session.id, at)
+        total = len(catalog.snapshots(game))
+        play_days = {s.created_at[:10] for s in catalog.snapshots(game)}
+
+        prune(catalog, game, day, recent_sessions=3, tz=UTC)
+        kept = catalog.snapshots(game)
+        sessions = catalog.sessions(game)
+
+        assert total == 600 and len(play_days) > 30
+        # Every checkpoint of the last three sessions is kept.
+        for session in sessions[-3:]:
+            assert sum(s.session_id == session.id for s in kept) == 12
+        # One snapshot per play-day for the most recent 30 play-days, one per week before.
+        older = [s for s in kept if s.session_id not in {x.id for x in sessions[-3:]}]
+        days = [s.created_at[:10] for s in older]
+        assert len(days) == len(set(days))
+        assert 40 <= len(kept) <= 80
+
+        # Months without playing remove nothing more.
+        assert prune(catalog, game, day + timedelta(days=365), 3, tz=UTC) == []

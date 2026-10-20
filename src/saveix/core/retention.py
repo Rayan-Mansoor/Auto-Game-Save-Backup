@@ -7,13 +7,15 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, tzinfo
 
 from saveix.core.catalog import Catalog
 from saveix.core.models import Game, Session, Snapshot, Trigger
 from saveix.core.timeline import parse_time
 
 SAFETY_KEEP_DAYS = 30
+DAILY_PLAY_DAYS = 30
+"""Play-days that keep one snapshot each; older play-days keep one per week."""
 
 
 def protected(snapshots: list[Snapshot], now: datetime) -> dict[int, str]:
@@ -56,6 +58,12 @@ class Removal:
     reason: str
 
 
+def _recent_session_ids(sessions: list[Session], recent_sessions: int) -> set[int]:
+    if recent_sessions <= 0:
+        return set()
+    return {s.id for s in sorted(sessions, key=lambda s: s.id)[-recent_sessions:]}
+
+
 def thin_sessions(
     snapshots: list[Snapshot], sessions: list[Session], recent_sessions: int
 ) -> list[Removal]:
@@ -64,9 +72,7 @@ def thin_sessions(
     Every snapshot of the most recent sessions is kept. If a session's last snapshot
     looks damaged, its newest healthy snapshot is kept too.
     """
-    recent = {s.id for s in sorted(sessions, key=lambda s: s.id)[-recent_sessions:]}
-    if recent_sessions <= 0:
-        recent = set()
+    recent = _recent_session_ids(sessions, recent_sessions)
     by_session: dict[int, list[Snapshot]] = defaultdict(list)
     for snap in snapshots:
         if snap.session_id is not None:
@@ -87,15 +93,66 @@ def thin_sessions(
     return removals
 
 
+def thin_by_play_time(
+    snapshots: list[Snapshot],
+    sessions: list[Session],
+    recent_sessions: int,
+    daily_play_days: int = DAILY_PLAY_DAYS,
+    tz: tzinfo | None = None,
+) -> list[Removal]:
+    """Older history keeps one snapshot per play-day, then one per play-week.
+
+    Age is counted in days the game was actually played, so a game left alone for
+    months keeps its history exactly as it was.
+    """
+    recent = _recent_session_ids(sessions, recent_sessions)
+
+    def day_of(snap: Snapshot) -> date:
+        return parse_time(snap.created_at).astimezone(tz).date()
+
+    play_days = sorted({day_of(s) for s in snapshots}, reverse=True)
+    daily = set(play_days[:daily_play_days])
+    # Everything since the oldest recent session (or, without sessions, from the most
+    # recent play-days) is the recent window and is never thinned.
+    recent_starts = [parse_time(s.started_at) for s in sessions if s.id in recent]
+    if recent_starts:
+        window_start = min(recent_starts)
+        in_window = lambda snap: parse_time(snap.created_at) >= window_start  # noqa: E731
+    else:
+        recent_days = set(play_days[: max(recent_sessions, 0)])
+        in_window = lambda snap: day_of(snap) in recent_days  # noqa: E731
+
+    buckets: dict[tuple, list[Snapshot]] = defaultdict(list)
+    for snap in snapshots:
+        if snap.session_id in recent or in_window(snap):
+            continue
+        day = day_of(snap)
+        if day in daily:
+            buckets[("day", day)].append(snap)
+        else:
+            buckets[("week", *day.isocalendar()[:2])].append(snap)
+
+    removals = []
+    for (kind, *_), snaps in buckets.items():
+        # Keep the latest state of each day or week.
+        for snap in snaps[:-1]:
+            period = "play-day" if kind == "day" else "play-week"
+            removals.append(Removal(snap, f"older {period} keeps only its last snapshot"))
+    return removals
+
+
 def plan_removals(
     snapshots: list[Snapshot],
     sessions: list[Session],
     now: datetime,
     recent_sessions: int,
+    tz: tzinfo | None = None,
 ) -> list[Removal]:
     """Everything the retention rules would remove, never including protected snapshots."""
     keep = protected(snapshots, now)
-    removals = thin_sessions(snapshots, sessions, recent_sessions)
+    removals = thin_sessions(snapshots, sessions, recent_sessions) + thin_by_play_time(
+        snapshots, sessions, recent_sessions, tz=tz
+    )
     seen: set[int] = set()
     result = []
     for removal in removals:
@@ -107,9 +164,16 @@ def plan_removals(
 
 
 def prune(
-    catalog: Catalog, game: Game, now: datetime, recent_sessions: int, dry_run: bool = False
+    catalog: Catalog,
+    game: Game,
+    now: datetime,
+    recent_sessions: int,
+    dry_run: bool = False,
+    tz: tzinfo | None = None,
 ) -> list[Removal]:
-    removals = plan_removals(catalog.snapshots(game), catalog.sessions(game), now, recent_sessions)
+    removals = plan_removals(
+        catalog.snapshots(game), catalog.sessions(game), now, recent_sessions, tz
+    )
     if not dry_run:
         for removal in removals:
             catalog.delete_snapshot(removal.snapshot.id)
