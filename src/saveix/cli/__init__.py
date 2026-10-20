@@ -8,6 +8,7 @@ from saveix import __version__
 from saveix.cli import (
     backup,
     config_cmd,
+    detect,
     diff,
     emulators,
     games,
@@ -39,6 +40,7 @@ app.command()(identify.identify)
 app.command()(emulators.emulators)
 app.command()(run.run)
 app.command()(prune.prune)
+app.command()(detect.detect)
 
 
 def _version_callback(value: bool) -> None:
