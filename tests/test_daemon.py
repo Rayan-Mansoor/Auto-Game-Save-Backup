@@ -61,8 +61,9 @@ def test_snapshot_when_session_ends(env):
     assert [n.message for n in notices] == [
         "session started",
         f"saved snapshot #{snap.id}",
-        "session ended",
+        "session ended; 1 snapshot saved",
     ]
+    assert [n.important for n in notices] == [False, False, True]
 
 
 def test_session_without_saves_warns(env):

@@ -17,6 +17,9 @@ dependencies = [
 [project.scripts]
 saveix = "saveix.cli:app"
 
+[project.gui-scripts]
+saveix-tray = "saveix.ui.tray:main"
+
 [project.entry-points."saveix.providers"]
 ludusavi = "saveix.integrations.ludusavi:create"
 launchers = "saveix.integrations.launchers:create"
@@ -25,9 +28,13 @@ launchers = "saveix.integrations.launchers:create"
 ludusavi = [
     "pyyaml>=6.0.3",
 ]
+gui = [
+    "pyside6>=6.7",
+]
 
 [dependency-groups]
 dev = [
+    "pyside6>=6.7",
     "pytest>=8",
     "pyyaml>=6.0.3",
     "ruff>=0.6",

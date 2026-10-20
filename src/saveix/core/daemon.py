@@ -25,6 +25,8 @@ class Notice:
     game: str
     message: str
     warning: bool = False
+    important: bool = False
+    """Worth a desktop notification (warnings always are)."""
 
 
 class Runner:
@@ -60,9 +62,11 @@ class Runner:
         for session in self.catalog.open_sessions():
             self.catalog.end_session(session.id, self.clock())
 
-    def _say(self, game: Game, message: str, warning: bool = False) -> None:
+    def _say(
+        self, game: Game, message: str, warning: bool = False, important: bool = False
+    ) -> None:
         (log.warning if warning else log.info)("%s: %s", game.name, message)
-        self.notify(Notice(game.name, message, warning))
+        self.notify(Notice(game.name, message, warning, important or warning))
 
     def poll(self) -> None:
         games = self.catalog.list_games()
@@ -104,9 +108,13 @@ class Runner:
             active.watcher.stop()
             session_id = active.session_id
         self.snapshot(game, Trigger.SESSION_END, session_id, crashed)
+        saved = 0
         if session_id is not None:
             self.catalog.end_session(session_id, self.clock(), crashed)
-        self._say(game, "session ended after a crash" if crashed else "session ended", crashed)
+            saved = sum(1 for s in self.catalog.snapshots(game) if s.session_id == session_id)
+        ended = "session ended after a crash" if crashed else "session ended"
+        noun = "snapshot" if saved == 1 else "snapshots"
+        self._say(game, f"{ended}; {saved} {noun} saved", warning=crashed, important=True)
         if self.retention:
             try:
                 for warning in self.retention(game):
