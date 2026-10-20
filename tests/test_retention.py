@@ -137,7 +137,7 @@ def test_labeled_checkpoints_survive_and_dry_run_changes_nothing(tmp_path):
 def test_prune_command_respects_keep_all(fake_home):
     runner.invoke(app, ["game", "add", "G"])
     runner.invoke(app, ["config", "set", "keep_all_snapshots", "true"])
-    assert "nothing is ever removed" in runner.invoke(app, ["prune"]).output
+    assert "no snapshots are removed" in runner.invoke(app, ["prune"]).output
     runner.invoke(app, ["config", "set", "keep_all_snapshots", "false"])
     assert "Removed 0 snapshots." in runner.invoke(app, ["prune"]).output
 

@@ -55,6 +55,8 @@ class ObjectStore:
             target = self.path_for(digest)
             if target.exists():
                 os.unlink(tmp_name)
+                # Mark it as recently used so garbage collection leaves it alone.
+                os.utime(target)
             else:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(tmp_name, target)
