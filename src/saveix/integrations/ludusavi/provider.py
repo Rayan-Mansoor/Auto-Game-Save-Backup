@@ -7,6 +7,7 @@ from pathlib import Path
 from saveix.core.providers import GameDetails, GameMatch, ProviderContext
 from saveix.integrations.ludusavi.download import Fetch, download_manifest, http_fetch
 from saveix.integrations.ludusavi.index import ManifestIndex, build_index, index_is_current
+from saveix.integrations.ludusavi.translate import translate_entry
 
 
 class LudusaviProvider:
@@ -78,4 +79,6 @@ class LudusaviProvider:
         return self._match(index, name) if name else None
 
     def details(self, match: GameMatch) -> GameDetails:
-        return GameDetails(match)
+        index = self.index()
+        entry = index.entry(match.key) if index else None
+        return translate_entry(match, entry) if entry else GameDetails(match)

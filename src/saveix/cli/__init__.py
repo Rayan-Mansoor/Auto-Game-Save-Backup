@@ -44,6 +44,7 @@ app.command()(run.run)
 app.command()(prune.prune)
 app.command()(detect.detect)
 app.command()(providers.search)
+app.command()(providers.suggest)
 
 
 def _version_callback(value: bool) -> None:
