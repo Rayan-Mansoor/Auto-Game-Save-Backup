@@ -83,6 +83,10 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE snapshots ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
     """,
+    # 10: whether a cloud service also syncs this game's saves
+    """
+    ALTER TABLE games ADD COLUMN cloud_sync INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 

@@ -54,6 +54,18 @@ class RestoreResult:
     deleted: int = 0
 
 
+CLOUD_WARNING = (
+    "{name} also syncs its saves through a cloud service (such as Steam Cloud). After "
+    "restoring, the service may offer its own copy or replace the restored saves. When it "
+    "asks about a conflict, choose the local files. If it does not ask, start the game "
+    "once with the cloud sync turned off or while offline so the restored saves are kept."
+)
+
+
+def cloud_warning(game: Game) -> str | None:
+    return CLOUD_WARNING.format(name=game.name) if game.cloud_sync else None
+
+
 def _digest_of(path: Path) -> str | None:
     hasher = hashlib.sha256()
     try:

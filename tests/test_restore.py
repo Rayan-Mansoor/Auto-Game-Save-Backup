@@ -179,3 +179,21 @@ def test_restore_refused_while_game_runs(saves, monkeypatch):
     assert result.exit_code == 1
     assert "is running" in result.output
     assert (saves / "slot.sav").read_bytes() == b"stage 2"
+
+
+def test_restore_warns_about_cloud_sync(saves):
+    write(saves / "slot.sav", b"stage 1", 1)
+    runner.invoke(app, ["game", "add", "G"])
+    runner.invoke(app, ["source", "add", "G", str(saves)])
+    runner.invoke(app, ["backup", "G"])
+    write(saves / "slot.sav", b"stage 2", 2)
+    assert runner.invoke(app, ["game", "set-cloud", "G", "true"]).exit_code == 0
+    assert "also synced by a cloud service" in runner.invoke(app, ["game", "show", "G"]).output
+
+    result = runner.invoke(app, ["restore", "G", "--yes"])
+    assert result.exit_code == 0
+    assert "choose the local files" in result.output
+
+    runner.invoke(app, ["game", "set-cloud", "G", "false"])
+    write(saves / "slot.sav", b"stage 3", 3)
+    assert "cloud" not in runner.invoke(app, ["restore", "G", "--yes"]).output

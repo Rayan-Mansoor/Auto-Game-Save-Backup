@@ -84,6 +84,10 @@ class Catalog:
         self._set_game_column(game, "checkpoint_interval_minutes", minutes)
         game.checkpoint_interval_minutes = minutes
 
+    def set_cloud_sync(self, game: Game, cloud_sync: bool) -> None:
+        self._set_game_column(game, "cloud_sync", int(cloud_sync))
+        game.cloud_sync = cloud_sync
+
     def _set_game_column(self, game: Game, column: str, value: object) -> None:
         self.db.execute(f"UPDATE games SET {column} = ? WHERE id = ?", (value, game.id))
 
@@ -96,6 +100,7 @@ class Catalog:
             gog_id=row["gog_id"],
             executables=json.loads(row["executables"]),
             checkpoint_interval_minutes=row["checkpoint_interval_minutes"],
+            cloud_sync=bool(row["cloud_sync"]),
         )
         game.sources = self.sources_for(game.id)
         return game

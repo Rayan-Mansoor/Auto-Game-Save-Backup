@@ -6,7 +6,7 @@ from saveix.cli.common import fail, open_catalog
 from saveix.core.backup import BackupEngine
 from saveix.core.config import Config
 from saveix.core.context import context_for
-from saveix.core.restore import Action, Restorer
+from saveix.core.restore import Action, Restorer, cloud_warning
 from saveix.core.sessions import running_games
 from saveix.core.store import CorruptObjectError, ObjectStore
 
@@ -54,6 +54,9 @@ def restore(
             return
         if running_games([target]):
             fail(f"{target.name} is running; close it before restoring its saves.")
+        warning = cloud_warning(target)
+        if warning:
+            typer.echo(f"warning: {warning}", err=True)
         if not yes:
             typer.confirm("Continue? Your current saves are backed up first.", abort=True)
         try:

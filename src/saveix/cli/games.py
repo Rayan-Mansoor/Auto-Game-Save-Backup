@@ -63,6 +63,8 @@ def game_show(name: str) -> None:
         typer.echo(f"  GOG ID {game.gog_id}")
     if game.executables:
         typer.echo(f"  executables: {', '.join(game.executables)}")
+    if game.cloud_sync:
+        typer.echo("  saves are also synced by a cloud service")
     if game.checkpoint_interval_minutes is not None:
         typer.echo(f"  checkpoints at most every {game.checkpoint_interval_minutes} minutes")
     print_sources(game)
@@ -145,6 +147,19 @@ def game_set_interval(
         typer.echo(f"{target.name} uses the default checkpoint interval.")
     else:
         typer.echo(f"{target.name}: checkpoints at most every {minutes} minutes.")
+
+
+@game_app.command("set-cloud")
+def game_set_cloud(
+    name: str,
+    enabled: bool = typer.Argument(..., help="true if a cloud service also syncs the saves."),
+) -> None:
+    """Mark whether a cloud service (such as Steam Cloud) also syncs a game's saves."""
+    with open_catalog() as catalog:
+        target = catalog.get_game(name)
+        catalog.set_cloud_sync(target, enabled)
+    state = "uses" if enabled else "does not use"
+    typer.echo(f"{target.name} {state} cloud sync.")
 
 
 @game_app.command("remove")

@@ -47,6 +47,8 @@ class Game:
     """Executable names or full paths whose processes mean the game is running."""
     checkpoint_interval_minutes: int | None = None
     """Minimum minutes between checkpoints for this game; None uses the global setting."""
+    cloud_sync: bool = False
+    """A cloud service (such as Steam Cloud) also syncs this game's saves."""
     sources: list[Source] = field(default_factory=list)
 
 
