@@ -6,6 +6,7 @@ import threading
 import typer
 
 from saveix.cli.common import open_catalog
+from saveix.cli.prune import apply_retention
 from saveix.core.backup import BackupEngine
 from saveix.core.config import Config
 from saveix.core.daemon import Runner
@@ -26,6 +27,7 @@ def run(
             BackupEngine(catalog, ObjectStore(config.backup_root)),
             quiet_period=config.settings.quiet_period_seconds,
             checkpoint_interval=config.settings.checkpoint_interval_minutes * 60,
+            retention=lambda game: apply_retention(config, catalog, game),
         )
         try:
             runner.run(stop, interval)

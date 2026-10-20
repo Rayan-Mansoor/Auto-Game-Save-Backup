@@ -46,6 +46,7 @@ class Settings:
     quiet_period_seconds: int = 10
     checkpoint_interval_minutes: int = 10
     recent_sessions_kept: int = 3
+    keep_all_snapshots: bool = False
     providers: list[str] = field(default_factory=list)
 
     @classmethod

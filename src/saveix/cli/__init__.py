@@ -12,6 +12,7 @@ from saveix.cli import (
     emulators,
     games,
     identify,
+    prune,
     restore,
     run,
     scan,
@@ -37,6 +38,7 @@ app.command()(restore.restore)
 app.command()(identify.identify)
 app.command()(emulators.emulators)
 app.command()(run.run)
+app.command()(prune.prune)
 
 
 def _version_callback(value: bool) -> None:

@@ -265,6 +265,9 @@ class Catalog:
         self.db.execute(f"UPDATE snapshots SET {column} = ? WHERE id = ?", (value, snapshot_id))
         return self.get_snapshot(snapshot_id)
 
+    def delete_snapshot(self, snapshot_id: int) -> None:
+        self.db.execute("DELETE FROM snapshots WHERE id = ?", (snapshot_id,))
+
     def set_pinned(self, snapshot_id: int, pinned: bool) -> Snapshot:
         self.get_snapshot(snapshot_id)
         self.db.execute("UPDATE snapshots SET pinned = ? WHERE id = ?", (int(pinned), snapshot_id))

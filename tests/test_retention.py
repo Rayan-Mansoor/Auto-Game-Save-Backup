@@ -3,8 +3,9 @@ from datetime import UTC, datetime
 from typer.testing import CliRunner
 
 from saveix.cli import app
+from saveix.core.catalog import Catalog
 from saveix.core.models import Snapshot, Trigger
-from saveix.core.retention import protected
+from saveix.core.retention import protected, prune
 
 runner = CliRunner()
 NOW = datetime(2026, 6, 1, tzinfo=UTC)
@@ -66,3 +67,76 @@ def test_pin_commands(fake_home):
     assert runner.invoke(app, ["unpin", "1"]).exit_code == 0
     assert "(pinned)" not in runner.invoke(app, ["timeline", "G"]).output
     assert runner.invoke(app, ["pin", "9"]).exit_code == 1
+
+
+# Session thinning ---------------------------------------------------------------
+
+
+def play(catalog, game, sessions, checkpoints, start_day=1, suspicious_end=()):
+    """Record sessions of checkpoints followed by an end-of-session snapshot."""
+    day = start_day
+    for n in range(sessions):
+        session = catalog.start_session(game, f"2026-05-{day:02d}T10:00:00Z")
+        for c in range(checkpoints):
+            snapshot = catalog.add_snapshot(
+                game,
+                Trigger.CHECKPOINT,
+                f"2026-05-{day:02d}T10:{c + 1:02d}:00Z",
+                f"{n}-{c}",
+                [],
+                session.id,
+            )
+            catalog.set_health(snapshot.id, "ok", [])
+        end = catalog.add_snapshot(
+            game, Trigger.SESSION_END, f"2026-05-{day:02d}T12:00:00Z", f"{n}-end", [], session.id
+        )
+        catalog.set_health(end.id, "suspicious" if n in suspicious_end else "ok", [])
+        catalog.end_session(session.id, f"2026-05-{day:02d}T12:00:00Z")
+        day += 1
+
+
+def kept_triggers(catalog, game):
+    by_session = {}
+    for s in catalog.snapshots(game):
+        by_session.setdefault(s.session_id, []).append(s.trigger)
+    return by_session
+
+
+def test_older_sessions_keep_only_their_final_state(tmp_path):
+    with Catalog(tmp_path / "c.sqlite3") as catalog:
+        game = catalog.add_game("G")
+        play(catalog, game, sessions=5, checkpoints=4)
+        removed = prune(catalog, game, NOW, recent_sessions=3)
+
+        assert len(removed) == 2 * 4
+        kept = kept_triggers(catalog, game)
+        assert kept[1] == kept[2] == [Trigger.SESSION_END]
+        assert kept[3] == kept[4] == kept[5] == [Trigger.CHECKPOINT] * 4 + [Trigger.SESSION_END]
+        assert prune(catalog, game, NOW, recent_sessions=3) == []
+
+
+def test_damaged_final_state_keeps_last_healthy_checkpoint(tmp_path):
+    with Catalog(tmp_path / "c.sqlite3") as catalog:
+        game = catalog.add_game("G")
+        play(catalog, game, sessions=4, checkpoints=3, suspicious_end={0})
+        prune(catalog, game, NOW, recent_sessions=3)
+        assert kept_triggers(catalog, game)[1] == [Trigger.CHECKPOINT, Trigger.SESSION_END]
+
+
+def test_labeled_checkpoints_survive_and_dry_run_changes_nothing(tmp_path):
+    with Catalog(tmp_path / "c.sqlite3") as catalog:
+        game = catalog.add_game("G")
+        play(catalog, game, sessions=4, checkpoints=3)
+        catalog.set_label(1, "Act 1 done")
+        assert len(prune(catalog, game, NOW, 3, dry_run=True)) == 2
+        assert len(catalog.snapshots(game)) == 16
+        prune(catalog, game, NOW, 3)
+        assert [s.id for s in catalog.snapshots(game)][:2] == [1, 4]
+
+
+def test_prune_command_respects_keep_all(fake_home):
+    runner.invoke(app, ["game", "add", "G"])
+    runner.invoke(app, ["config", "set", "keep_all_snapshots", "true"])
+    assert "nothing is ever removed" in runner.invoke(app, ["prune"]).output
+    runner.invoke(app, ["config", "set", "keep_all_snapshots", "false"])
+    assert "Removed 0 snapshots." in runner.invoke(app, ["prune"]).output
