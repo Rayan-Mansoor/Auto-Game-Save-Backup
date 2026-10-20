@@ -14,6 +14,8 @@ app.add_typer(games.source_app, name="source")
 app.command()(scan.scan)
 app.command()(backup.backup)
 app.command()(timeline.timeline)
+app.command()(timeline.label)
+app.command()(timeline.note)
 
 
 def _version_callback(value: bool) -> None:

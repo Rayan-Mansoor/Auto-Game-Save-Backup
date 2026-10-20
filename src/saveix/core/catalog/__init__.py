@@ -217,3 +217,15 @@ class Catalog:
             label=row["label"],
             note=row["note"],
         )
+
+    def set_label(self, snapshot_id: int, label: str | None) -> Snapshot:
+        return self._update_snapshot(snapshot_id, "label", label)
+
+    def set_note(self, snapshot_id: int, note: str | None) -> Snapshot:
+        return self._update_snapshot(snapshot_id, "note", note)
+
+    def _update_snapshot(self, snapshot_id: int, column: str, value: str | None) -> Snapshot:
+        value = (value or "").strip() or None
+        self.get_snapshot(snapshot_id)
+        self.db.execute(f"UPDATE snapshots SET {column} = ? WHERE id = ?", (value, snapshot_id))
+        return self.get_snapshot(snapshot_id)

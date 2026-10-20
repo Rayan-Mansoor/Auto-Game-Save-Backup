@@ -30,3 +30,28 @@ def timeline(
         )
         if snap.note:
             typer.echo(f"       note: {snap.note}")
+
+
+def label(
+    snapshot_id: int,
+    text: str = typer.Argument("", help="New label; leave out to go back to the automatic one."),
+) -> None:
+    """Name a snapshot, for example to mark a game stage."""
+    with open_catalog() as catalog:
+        snap = catalog.set_label(snapshot_id, text)
+    if snap.label:
+        typer.echo(f'Snapshot #{snap.id} is now labeled "{snap.label}".')
+    else:
+        typer.echo(f"Snapshot #{snap.id} uses its automatic label again.")
+
+
+def note(
+    snapshot_id: int,
+    text: str = typer.Argument("", help="Note text; leave out to remove the note."),
+) -> None:
+    """Attach a note to a snapshot."""
+    with open_catalog() as catalog:
+        snap = catalog.set_note(snapshot_id, text)
+    typer.echo(
+        f"Saved note on snapshot #{snap.id}." if snap.note else f"Removed note from #{snap.id}."
+    )
