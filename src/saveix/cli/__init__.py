@@ -6,6 +6,7 @@ import typer
 
 from saveix import __version__
 from saveix.cli import (
+    autostart,
     backup,
     config_cmd,
     detect,
@@ -42,6 +43,7 @@ app.command()(identify.identify)
 app.command()(emulators.emulators)
 app.command()(run.run)
 app.command()(run.tray)
+app.command()(autostart.autostart)
 app.command()(prune.prune)
 app.command()(detect.detect)
 app.command()(providers.search)

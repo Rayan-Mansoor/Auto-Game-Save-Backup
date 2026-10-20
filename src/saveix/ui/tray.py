@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, Qt, QThread, Signal
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from saveix.core import autostart
 from saveix.core.backup import BackupEngine
 from saveix.core.catalog import Catalog
 from saveix.core.config import Config
@@ -89,10 +90,20 @@ class TrayApp(QObject):
         self.status.setEnabled(False)
         self.pause_action = QAction("Pause backups")
         self.pause_action.triggered.connect(self.toggle_pause)
+        self.autostart_action = QAction("Start with Windows")
+        self.autostart_action.setCheckable(True)
+        try:
+            self.autostart_action.setChecked(autostart.is_enabled(self.run_key()))
+        except autostart.AutostartUnavailableError:
+            self.autostart_action.setEnabled(False)
+        # Connected after setting the initial state, so opening the menu changes nothing.
+        self.autostart_action.toggled.connect(self.set_autostart)
         quit_action = QAction("Quit")
         quit_action.triggered.connect(self.quit)
         for action in (self.status, self.pause_action):
             self.menu.addAction(action)
+        self.menu.addSeparator()
+        self.menu.addAction(self.autostart_action)
         self.menu.addSeparator()
         self.menu.addAction(quit_action)
         self._actions = [quit_action]
@@ -104,6 +115,19 @@ class TrayApp(QObject):
     def start(self) -> None:
         self.tray.show()
         self.runner.start()
+
+    def run_key(self) -> autostart.RunKey | None:
+        """The registry key used for autostart; tests replace it."""
+        return None
+
+    def set_autostart(self, enabled: bool) -> None:
+        try:
+            if enabled:
+                autostart.enable(self.run_key())
+            else:
+                autostart.disable(self.run_key())
+        except (autostart.AutostartUnavailableError, OSError) as exc:
+            log.warning("could not change autostart: %s", exc)
 
     def toggle_pause(self) -> None:
         if self.runner.paused.is_set():
