@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from saveix.core.models import SourceKind
+from saveix.core.models import MANUAL, Source, SourceKind, SourceRole
 from saveix.core.paths import ALL_PLACEHOLDERS, PathContext, normalize
 
 GLOB_CHARS = set("*?[")
@@ -48,3 +48,39 @@ def breadth_problem(template: str) -> str | None:
     if text.startswith("*") or text in {f"{name}/*" for name in ALL_PLACEHOLDERS}:
         return f"'{template}' matches far too much"
     return None
+
+
+def make_source(
+    path: str,
+    context: PathContext,
+    kind: SourceKind | None = None,
+    role: SourceRole = SourceRole.SAVE,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
+    force: bool = False,
+    origin: str = MANUAL,
+) -> Source:
+    """Build a source from a path the user gave: a real path, template or registry key.
+
+    Raises SourceError when the path cannot be used or looks too broad (unless forced).
+    """
+    from saveix.core.paths import UnresolvedPlaceholderError
+    from saveix.core.sources.registry import RegistryError, is_registry_path, normalize_key
+
+    if kind is SourceKind.REGISTRY or (kind is None and is_registry_path(path)):
+        kind = SourceKind.REGISTRY
+        try:
+            template = normalize_key(path)
+        except RegistryError as exc:
+            raise SourceError(str(exc)) from None
+    else:
+        template = to_template(path, context)
+        if kind is None:
+            try:
+                kind = guess_kind(context.expand(template))
+            except UnresolvedPlaceholderError as exc:
+                raise SourceError(str(exc)) from None
+    problem = breadth_problem(template)
+    if problem and not force:
+        raise SourceError(f"{problem}. Use --force to add it anyway.")
+    return Source(kind, template, role, list(include or []), list(exclude or []), origin)

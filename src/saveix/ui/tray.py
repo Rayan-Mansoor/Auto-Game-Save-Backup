@@ -86,6 +86,11 @@ class TrayApp(QObject):
         self.tray = QSystemTrayIcon(self.icon)
         self.tray.setToolTip("SaveIX: watching for game sessions")
         self.menu = QMenu()
+        self.window = None
+        self.open_action = QAction("Open SaveIX")
+        self.open_action.triggered.connect(self.open_window)
+        self.menu.addAction(self.open_action)
+        self.menu.addSeparator()
         self.status = QAction("Watching for game sessions")
         self.status.setEnabled(False)
         self.pause_action = QAction("Pause backups")
@@ -108,6 +113,7 @@ class TrayApp(QObject):
         self.menu.addAction(quit_action)
         self._actions = [quit_action]
         self.tray.setContextMenu(self.menu)
+        self.tray.activated.connect(self.on_activated)
 
         self.runner = RunnerThread(self.config)
         self.runner.notice.connect(self.on_notice)
@@ -115,6 +121,16 @@ class TrayApp(QObject):
     def start(self) -> None:
         self.tray.show()
         self.runner.start()
+
+    def open_window(self) -> None:
+        from saveix.ui.main_window import LibraryWindow
+
+        if self.window is None:
+            self.window = LibraryWindow(self.config)
+        self.window.refresh()
+        self.window.show()
+        self.window.raise_()
+        self.window.activateWindow()
 
     def run_key(self) -> autostart.RunKey | None:
         """The registry key used for autostart; tests replace it."""
@@ -149,8 +165,14 @@ class TrayApp(QObject):
             )
             self.tray.showMessage(notice.game, notice.message, kind, 8000)
 
+    def on_activated(self, reason) -> None:
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.open_window()
+
     def quit(self) -> None:
         self.runner.stop()
+        if self.window is not None:
+            self.window.catalog.close()
         self.tray.hide()
         self.app.quit()
 

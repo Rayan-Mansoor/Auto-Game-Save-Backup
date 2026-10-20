@@ -60,3 +60,13 @@ def tray() -> None:
         typer.echo(f"The tray app needs PySide6 (pip install saveix[gui]): {exc}", err=True)
         raise typer.Exit(1) from None
     raise typer.Exit(main())
+
+
+def gui() -> None:
+    """Open the saveix window (needs the gui extra)."""
+    try:
+        from saveix.ui.main_window import main
+    except ImportError as exc:
+        typer.echo(f"The window needs PySide6 (pip install saveix[gui]): {exc}", err=True)
+        raise typer.Exit(1) from None
+    raise typer.Exit(main())

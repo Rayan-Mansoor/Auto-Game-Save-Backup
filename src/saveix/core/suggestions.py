@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from saveix.core.catalog import Catalog
 from saveix.core.emulators import STEAM_REMOTE, Emulator, translate
 from saveix.core.models import Game, Source, SourceKind
 from saveix.core.paths import PathContext
@@ -51,3 +52,22 @@ def check_candidates(
             scan = scan_source(source, context, registry)
             checked.append(CheckedCandidate(source, len(scan.files), scan.size, note))
     return checked
+
+
+def apply_details(catalog: Catalog, game: Game, details: GameDetails) -> list[str]:
+    """Fill in what the provider knows and the game does not yet; returns what changed."""
+    changes = []
+    if not game.install_dir and details.install_dir:
+        catalog.set_install_dir(game, details.install_dir)
+        changes.append(f"Installed in {details.install_dir}")
+    if not game.steam_app_id and not game.gog_id:
+        match = details.match
+        if match.steam_app_id or match.gog_id:
+            catalog.set_store_ids(game, match.steam_app_id, match.gog_id)
+    if not game.executables and details.executables:
+        catalog.set_executables(game, details.executables)
+        changes.append(f"Executables: {', '.join(details.executables)}")
+    if details.cloud_sync and not game.cloud_sync:
+        catalog.set_cloud_sync(game, True)
+        changes.append("This game can also sync saves through a cloud service.")
+    return changes

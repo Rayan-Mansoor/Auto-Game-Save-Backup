@@ -8,9 +8,8 @@ import typer
 
 from saveix.cli.common import fail, open_catalog
 from saveix.core.context import context_for
-from saveix.core.models import Game, Source, SourceKind, SourceRole
-from saveix.core.sources import SourceError, breadth_problem, guess_kind, to_template
-from saveix.core.sources.registry import RegistryError, is_registry_path, normalize_key
+from saveix.core.models import Game, SourceKind, SourceRole
+from saveix.core.sources import SourceError, make_source
 
 game_app = typer.Typer(help="Manage the games saveix backs up.", no_args_is_help=True)
 source_app = typer.Typer(help="Manage where a game keeps its saves.", no_args_is_help=True)
@@ -187,28 +186,16 @@ def source_add(
     force: bool = typer.Option(False, help="Add even if the path looks too broad."),
 ) -> None:
     """Add a save location to a game."""
-    if kind is SourceKind.REGISTRY or (kind is None and is_registry_path(path)):
-        kind = SourceKind.REGISTRY
-        try:
-            template = normalize_key(path)
-        except RegistryError as exc:
-            fail(str(exc))
     with open_catalog() as catalog:
         target = catalog.get_game(game)
-        if kind is not SourceKind.REGISTRY:
-            context = context_for(target)
-            template = to_template(path, context)
-            if kind is None:
-                try:
-                    kind = guess_kind(context.expand(template))
-                except (SourceError, ValueError) as exc:
-                    fail(str(exc))
-        problem = breadth_problem(template)
-        if problem and not force:
-            fail(f"{problem}. Use --force to add it anyway.")
-        source = Source(kind, template, role, include=include, exclude=exclude)
+        try:
+            source = make_source(
+                path, context_for(target), kind, role, include, exclude, force=force
+            )
+        except SourceError as exc:
+            fail(str(exc))
         catalog.add_source(target, source)
-    typer.echo(f"Added [{source.id}] {kind.value} {template} to {target.name}.")
+    typer.echo(f"Added [{source.id}] {source.kind.value} {source.path} to {target.name}.")
 
 
 @source_app.command("remove")
