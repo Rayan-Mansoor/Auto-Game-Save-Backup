@@ -80,6 +80,10 @@ class Catalog:
         self._set_game_column(game, "executables", json.dumps(executables))
         game.executables = list(executables)
 
+    def set_checkpoint_interval(self, game: Game, minutes: int | None) -> None:
+        self._set_game_column(game, "checkpoint_interval_minutes", minutes)
+        game.checkpoint_interval_minutes = minutes
+
     def _set_game_column(self, game: Game, column: str, value: object) -> None:
         self.db.execute(f"UPDATE games SET {column} = ? WHERE id = ?", (value, game.id))
 
@@ -91,6 +95,7 @@ class Catalog:
             steam_app_id=row["steam_app_id"],
             gog_id=row["gog_id"],
             executables=json.loads(row["executables"]),
+            checkpoint_interval_minutes=row["checkpoint_interval_minutes"],
         )
         game.sources = self.sources_for(game.id)
         return game

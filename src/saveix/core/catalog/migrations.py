@@ -70,6 +70,10 @@ MIGRATIONS: list[str] = [
     );
     ALTER TABLE snapshots ADD COLUMN session_id INTEGER REFERENCES sessions(id) ON DELETE SET NULL;
     """,
+    # 7: per-game minimum gap between checkpoints (NULL uses the global setting)
+    """
+    ALTER TABLE games ADD COLUMN checkpoint_interval_minutes INTEGER;
+    """,
 ]
 
 

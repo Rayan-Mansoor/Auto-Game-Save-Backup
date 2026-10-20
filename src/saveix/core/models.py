@@ -45,6 +45,8 @@ class Game:
     gog_id: int | None = None
     executables: list[str] = field(default_factory=list)
     """Executable names or full paths whose processes mean the game is running."""
+    checkpoint_interval_minutes: int | None = None
+    """Minimum minutes between checkpoints for this game; None uses the global setting."""
     sources: list[Source] = field(default_factory=list)
 
 

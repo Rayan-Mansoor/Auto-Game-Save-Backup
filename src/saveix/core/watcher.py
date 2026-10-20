@@ -12,7 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
-from saveix.core.models import Game, Source, SourceKind
+from saveix.core.models import Game, Source, SourceKind, SourceRole
 from saveix.core.paths import PathContext, UnresolvedPlaceholderError, normalize
 from saveix.core.sources import has_glob
 from saveix.core.sources.resolve import matches
@@ -85,8 +85,13 @@ class ChangeTracker:
         self._last_change: float | None = None
 
     def record(self, path: str, now: float) -> bool:
-        """Note a changed path; returns whether it belongs to one of the game's sources."""
-        if not any(source_covers(s, self.context, path) for s in self.game.sources):
+        """Note a changed path; returns whether it is a save change.
+
+        Changes to config sources are captured with the next snapshot but never
+        trigger one by themselves.
+        """
+        covering = [s for s in self.game.sources if source_covers(s, self.context, path)]
+        if not any(s.role is SourceRole.SAVE for s in covering):
             return False
         with self._lock:
             self._last_change = now

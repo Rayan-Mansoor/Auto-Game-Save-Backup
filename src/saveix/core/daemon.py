@@ -36,6 +36,7 @@ class Runner:
         clock: Callable[[], str] = utc_now,
         notify: Callable[[Notice], None] | None = None,
         quiet_period: float = 10.0,
+        checkpoint_interval: float = 600.0,
         watcher_factory: Callable[[], FolderWatcher] = WatchdogWatcher,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -45,6 +46,7 @@ class Runner:
         self.clock = clock
         self.notify = notify or (lambda notice: None)
         self.quiet_period = quiet_period
+        self.checkpoint_interval = checkpoint_interval
         self.watcher_factory = watcher_factory
         self.monotonic = monotonic
         self.active: dict[int, _Active] = {}
@@ -69,9 +71,17 @@ class Runner:
                 self._session_ended(event.game, event.crashed)
         now = self.monotonic()
         for active in list(self.active.values()):
-            if active.tracker.due(now):
+            if active.tracker.due(now) and self._gap_passed(active, now):
                 active.tracker.reset()
+                active.last_checkpoint = now
                 self.snapshot(active.game, Trigger.CHECKPOINT, active.session_id)
+
+    def _gap_passed(self, active: _Active, now: float) -> bool:
+        """Checkpoints are at least the game's interval apart; later saves wait for the
+        next allowed checkpoint or the end of the session."""
+        minutes = active.game.checkpoint_interval_minutes
+        gap = self.checkpoint_interval if minutes is None else minutes * 60
+        return active.last_checkpoint is None or now - active.last_checkpoint >= gap
 
     def _session_started(self, game: Game) -> None:
         session = self.catalog.start_session(game, self.clock())
@@ -133,3 +143,4 @@ class _Active:
     session_id: int
     tracker: ChangeTracker
     watcher: FolderWatcher
+    last_checkpoint: float | None = None

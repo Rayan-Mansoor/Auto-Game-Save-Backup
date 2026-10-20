@@ -25,6 +25,7 @@ def run(
             catalog,
             BackupEngine(catalog, ObjectStore(config.backup_root)),
             quiet_period=config.settings.quiet_period_seconds,
+            checkpoint_interval=config.settings.checkpoint_interval_minutes * 60,
         )
         try:
             runner.run(stop, interval)

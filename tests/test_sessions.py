@@ -114,3 +114,11 @@ def test_exe_commands(fake_home):
     assert runner.invoke(app, ["game", "remove-exe", "G", "g.exe"]).exit_code == 0
     assert runner.invoke(app, ["game", "remove-exe", "G", "g.exe"]).exit_code == 1
     assert "None of your games are running" in runner.invoke(app, ["game", "running"]).output
+
+
+def test_set_interval_command(fake_home):
+    runner.invoke(app, ["game", "add", "G"])
+    assert runner.invoke(app, ["game", "set-interval", "G", "3"]).exit_code == 0
+    assert "at most every 3 minutes" in runner.invoke(app, ["game", "show", "G"]).output
+    assert runner.invoke(app, ["game", "set-interval", "G"]).exit_code == 0
+    assert "at most every" not in runner.invoke(app, ["game", "show", "G"]).output

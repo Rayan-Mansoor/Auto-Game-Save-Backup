@@ -63,6 +63,8 @@ def game_show(name: str) -> None:
         typer.echo(f"  GOG ID {game.gog_id}")
     if game.executables:
         typer.echo(f"  executables: {', '.join(game.executables)}")
+    if game.checkpoint_interval_minutes is not None:
+        typer.echo(f"  checkpoints at most every {game.checkpoint_interval_minutes} minutes")
     print_sources(game)
 
 
@@ -124,6 +126,25 @@ def game_running() -> None:
         typer.echo("None of your games are running.")
     for game in running:
         typer.echo(f"{game.name} is running.")
+
+
+@game_app.command("set-interval")
+def game_set_interval(
+    name: str,
+    minutes: int | None = typer.Argument(
+        None, help="Minimum minutes between checkpoints (0 = no limit); leave out for default."
+    ),
+) -> None:
+    """Change how often checkpoints may be taken for one game."""
+    if minutes is not None and minutes < 0:
+        fail("Minutes must not be negative")
+    with open_catalog() as catalog:
+        target = catalog.get_game(name)
+        catalog.set_checkpoint_interval(target, minutes)
+    if minutes is None:
+        typer.echo(f"{target.name} uses the default checkpoint interval.")
+    else:
+        typer.echo(f"{target.name}: checkpoints at most every {minutes} minutes.")
 
 
 @game_app.command("remove")
