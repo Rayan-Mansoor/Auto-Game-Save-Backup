@@ -5,7 +5,7 @@ import typer
 from saveix.cli.common import fail, open_catalog
 from saveix.core.backup import BackupEngine
 from saveix.core.config import Config
-from saveix.core.paths import PathContext
+from saveix.core.context import context_for
 from saveix.core.restore import Action, Restorer
 from saveix.core.store import CorruptObjectError, ObjectStore
 
@@ -26,9 +26,9 @@ def restore(
 ) -> None:
     """Put a game's saves back to any snapshot. The current state is saved first."""
     config = Config()
-    context = PathContext.for_system()
     with open_catalog(config) as catalog:
         target = catalog.get_game(game)
+        context = context_for(target)
         if snapshot is None:
             chosen = catalog.latest_snapshot(target)
             if chosen is None:

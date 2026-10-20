@@ -66,8 +66,15 @@ class Catalog:
         game = self.get_game(name)
         self.db.execute("DELETE FROM games WHERE id = ?", (game.id,))
 
+    def set_install_dir(self, game: Game, install_dir: str | None) -> None:
+        self._set_game_column(game, "install_dir", install_dir)
+        game.install_dir = install_dir
+
+    def _set_game_column(self, game: Game, column: str, value: object) -> None:
+        self.db.execute(f"UPDATE games SET {column} = ? WHERE id = ?", (value, game.id))
+
     def _game(self, row: sqlite3.Row) -> Game:
-        game = Game(name=row["name"], id=row["id"])
+        game = Game(name=row["name"], id=row["id"], install_dir=row["install_dir"])
         game.sources = self.sources_for(game.id)
         return game
 

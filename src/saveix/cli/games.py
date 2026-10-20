@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import typer
 
 from saveix.cli.common import fail, open_catalog
+from saveix.core.context import context_for
 from saveix.core.models import Game, Source, SourceKind, SourceRole
-from saveix.core.paths import PathContext
 from saveix.core.sources import SourceError, breadth_problem, guess_kind, to_template
 from saveix.core.sources.registry import RegistryError, is_registry_path, normalize_key
 
@@ -53,7 +55,29 @@ def game_show(name: str) -> None:
     with open_catalog() as catalog:
         game = catalog.get_game(name)
     typer.echo(game.name)
+    if game.install_dir:
+        typer.echo(f"  installed in {game.install_dir}")
     print_sources(game)
+
+
+@game_app.command("set-install")
+def game_set_install(
+    name: str,
+    folder: str = typer.Argument("", help="The game's install folder; leave out to clear it."),
+) -> None:
+    """Tell saveix where a game is installed, for saves kept in its own folder."""
+    install = None
+    if folder:
+        path = Path(folder).expanduser().absolute()
+        if not path.is_dir():
+            fail(f"'{folder}' is not a folder")
+        install = str(path)
+    with open_catalog() as catalog:
+        target = catalog.get_game(name)
+        catalog.set_install_dir(target, install)
+    typer.echo(
+        f"{target.name} is installed in {install}." if install else "Install folder cleared."
+    )
 
 
 @game_app.command("remove")
@@ -87,19 +111,19 @@ def source_add(
             template = normalize_key(path)
         except RegistryError as exc:
             fail(str(exc))
-    else:
-        context = PathContext.for_system()
-        template = to_template(path, context)
-        if kind is None:
-            try:
-                kind = guess_kind(context.expand(template))
-            except SourceError as exc:
-                fail(str(exc))
-    problem = breadth_problem(template)
-    if problem and not force:
-        fail(f"{problem}. Use --force to add it anyway.")
     with open_catalog() as catalog:
         target = catalog.get_game(game)
+        if kind is not SourceKind.REGISTRY:
+            context = context_for(target)
+            template = to_template(path, context)
+            if kind is None:
+                try:
+                    kind = guess_kind(context.expand(template))
+                except (SourceError, ValueError) as exc:
+                    fail(str(exc))
+        problem = breadth_problem(template)
+        if problem and not force:
+            fail(f"{problem}. Use --force to add it anyway.")
         source = Source(kind, template, role, include=include, exclude=exclude)
         catalog.add_source(target, source)
     typer.echo(f"Added [{source.id}] {kind.value} {template} to {target.name}.")

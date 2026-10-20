@@ -39,6 +39,8 @@ class Source:
 class Game:
     name: str
     id: int | None = None
+    install_dir: str | None = None
+    """The game's install folder on this PC; resolves ``<install>`` in source paths."""
     sources: list[Source] = field(default_factory=list)
 
 

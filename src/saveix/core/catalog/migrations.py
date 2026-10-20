@@ -46,6 +46,10 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX snapshot_files_by_digest ON snapshot_files (digest);
     """,
+    # 3: where a game is installed on this PC, for <install> paths
+    """
+    ALTER TABLE games ADD COLUMN install_dir TEXT;
+    """,
 ]
 
 

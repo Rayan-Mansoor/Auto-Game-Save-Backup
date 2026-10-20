@@ -3,7 +3,7 @@
 import typer
 
 from saveix.cli.common import open_catalog
-from saveix.core.paths import PathContext
+from saveix.core.context import context_for
 from saveix.core.sources.resolve import scan_game
 
 
@@ -22,7 +22,7 @@ def scan(
     """Show which files a game's sources currently cover."""
     with open_catalog() as catalog:
         target = catalog.get_game(game)
-    scans = scan_game(target, PathContext.for_system())
+    scans = scan_game(target, context_for(target))
     for result in scans:
         s = result.source
         if result.error:

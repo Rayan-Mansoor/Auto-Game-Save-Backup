@@ -6,8 +6,8 @@ from saveix.cli.common import fail, open_catalog
 from saveix.cli.scan import human_size
 from saveix.core.backup import BackupEngine, NothingToBackUpError
 from saveix.core.config import Config
+from saveix.core.context import context_for
 from saveix.core.models import Trigger
-from saveix.core.paths import PathContext
 from saveix.core.store import ObjectStore
 
 
@@ -18,7 +18,7 @@ def backup(game: str) -> None:
         target = catalog.get_game(game)
         engine = BackupEngine(catalog, ObjectStore(config.backup_root))
         try:
-            result = engine.backup(target, PathContext.for_system(), Trigger.MANUAL)
+            result = engine.backup(target, context_for(target), Trigger.MANUAL)
         except NothingToBackUpError as exc:
             fail(str(exc))
 
