@@ -33,6 +33,9 @@ gui = [
 ]
 
 [dependency-groups]
+build = [
+    "pyinstaller>=6.22.3",
+]
 dev = [
     "pyside6>=6.7",
     "pytest>=8",

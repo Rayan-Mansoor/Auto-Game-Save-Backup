@@ -1,0 +1,31 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --group build
+      - name: Test
+        run: uv run pytest
+      - name: Build executables
+        run: uv run pyinstaller packaging/saveix.spec --noconfirm
+      - name: Smoke test the frozen CLI
+        run: dist\saveix\saveix.exe --version
+        shell: cmd
+      - name: Build installer
+        run: |
+          $version = (uv run python -c "import saveix; print(saveix.__version__)").Trim()
+          iscc /DAppVersion=$version packaging\installer.iss
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: saveix-installer
+          path: dist/installer/*.exe

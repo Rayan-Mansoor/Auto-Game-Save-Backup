@@ -55,7 +55,9 @@ def tray_command() -> str:
     """The command that starts the tray app without a console window."""
     executable = Path(sys.executable)
     if getattr(sys, "frozen", False):
-        return f'"{executable}" tray'
+        # The installed app ships a separate windowless tray program next to the CLI.
+        tray = executable.with_name("saveix-tray.exe")
+        return f'"{tray}"' if tray.exists() else f'"{executable}" tray'
     windowless = executable.with_name("pythonw.exe")
     python = windowless if windowless.exists() else executable
     return f'"{python}" -m saveix tray'

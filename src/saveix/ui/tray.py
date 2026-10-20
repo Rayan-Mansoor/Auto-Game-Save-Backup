@@ -95,6 +95,8 @@ class TrayApp(QObject):
         self.status.setEnabled(False)
         self.pause_action = QAction("Pause backups")
         self.pause_action.triggered.connect(self.toggle_pause)
+        self.log_action = QAction("Open log file")
+        self.log_action.triggered.connect(self.open_log)
         self.autostart_action = QAction("Start with Windows")
         self.autostart_action.setCheckable(True)
         try:
@@ -109,6 +111,7 @@ class TrayApp(QObject):
             self.menu.addAction(action)
         self.menu.addSeparator()
         self.menu.addAction(self.autostart_action)
+        self.menu.addAction(self.log_action)
         self.menu.addSeparator()
         self.menu.addAction(quit_action)
         self._actions = [quit_action]
@@ -131,6 +134,14 @@ class TrayApp(QObject):
         self.window.show()
         self.window.raise_()
         self.window.activateWindow()
+
+    def open_log(self) -> None:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        from saveix.core.logs import log_file
+
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(log_file(self.config))))
 
     def run_key(self) -> autostart.RunKey | None:
         """The registry key used for autostart; tests replace it."""
@@ -178,7 +189,11 @@ class TrayApp(QObject):
 
 
 def main() -> int:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    from saveix import __version__
+    from saveix.core.logs import setup_logging
+
+    setup_logging(Config())
+    log.info("saveix %s tray started", __version__)
     app = QApplication.instance() or QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("SaveIX")

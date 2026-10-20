@@ -1,6 +1,5 @@
 """`saveix run` command."""
 
-import logging
 import threading
 
 import typer
@@ -9,6 +8,7 @@ from saveix.cli.common import open_catalog
 from saveix.core.backup import BackupEngine
 from saveix.core.config import Config
 from saveix.core.daemon import Runner
+from saveix.core.logs import setup_logging
 from saveix.core.retention import retention_hook
 from saveix.core.store import ObjectStore
 
@@ -17,8 +17,8 @@ def run(
     interval: float = typer.Option(5.0, help="Seconds between checks for running games."),
 ) -> None:
     """Watch for play sessions and back up saves automatically (Ctrl+C to stop)."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
     config = Config()
+    setup_logging(config, console=True)
     stop = threading.Event()
     _lower_priority()
     with open_catalog(config) as catalog:
