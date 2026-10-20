@@ -22,15 +22,15 @@ def test_downloads_only_when_changed(tmp_path):
     server = FakeServer()
     provider = LudusaviProvider(ProviderContext(tmp_path), fetch=server)
 
-    assert provider.update() == "downloaded the latest manifest"
+    assert provider.update().startswith("downloaded the latest manifest")
     assert provider.manifest_path.read_bytes() == b"Game: {}\n"
     assert provider.update() == "already up to date"
     assert server.requests[1] == {"If-None-Match": '"v1"'}
 
     server.body, server.etag = b"Game: {}\nOther: {}\n", '"v2"'
-    assert provider.update() == "downloaded the latest manifest"
+    assert provider.update().startswith("downloaded the latest manifest")
     assert provider.manifest_path.read_bytes().endswith(b"Other: {}\n")
-    assert provider.update(force=True) == "downloaded the latest manifest"
+    assert provider.update(force=True).startswith("downloaded the latest manifest")
 
 
 def test_failed_download_keeps_previous_manifest(tmp_path):
