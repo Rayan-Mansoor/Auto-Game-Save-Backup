@@ -35,7 +35,7 @@ class Runner:
         detector: SessionDetector | None = None,
         clock: Callable[[], str] = utc_now,
         notify: Callable[[Notice], None] | None = None,
-        retention: Callable[[Game], None] | None = None,
+        retention: Callable[[Game], list[str]] | None = None,
         quiet_period: float = 10.0,
         checkpoint_interval: float = 600.0,
         watcher_factory: Callable[[], FolderWatcher] = WatchdogWatcher,
@@ -109,7 +109,8 @@ class Runner:
         self._say(game, "session ended after a crash" if crashed else "session ended", crashed)
         if self.retention:
             try:
-                self.retention(game)
+                for warning in self.retention(game):
+                    self._say(game, warning, warning=True)
             except Exception:
                 log.exception("%s: thinning old snapshots failed", game.name)
 

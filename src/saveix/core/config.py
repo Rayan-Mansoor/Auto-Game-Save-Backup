@@ -47,6 +47,10 @@ class Settings:
     checkpoint_interval_minutes: int = 10
     recent_sessions_kept: int = 3
     keep_all_snapshots: bool = False
+    max_snapshots_per_game: int = 0
+    """0 means no limit."""
+    max_storage_mb: int = 0
+    """Limit for the whole backup store; 0 means no limit."""
     providers: list[str] = field(default_factory=list)
 
     @classmethod

@@ -180,3 +180,65 @@ def test_long_history_stays_small_and_useful(tmp_path):
 
         # Months without playing remove nothing more.
         assert prune(catalog, game, day + timedelta(days=365), 3, tz=UTC) == []
+
+
+def test_count_limit_removes_oldest_unprotected(tmp_path):
+    from saveix.core.config import Settings
+    from saveix.core.retention import apply_policy
+
+    with Catalog(tmp_path / "c.sqlite3") as catalog:
+        game = catalog.add_game("G")
+        for i in range(6):
+            s = catalog.add_snapshot(game, Trigger.MANUAL, f"2026-05-01T10:0{i}:00Z", str(i), [])
+            catalog.set_health(s.id, "ok", [])
+        catalog.set_pinned(1, True)
+        settings = Settings(max_snapshots_per_game=3)
+
+        report = apply_policy(catalog, game, settings, NOW)
+        assert [r.snapshot.id for r in report.removals] == [2, 3, 4]
+        assert [s.id for s in catalog.snapshots(game)] == [1, 5, 6]
+        assert report.warnings == []
+
+        report = apply_policy(catalog, game, Settings(max_snapshots_per_game=1), NOW)
+        assert [r.snapshot.id for r in report.removals] == [5]
+        assert "because the rest are protected" in report.warnings[0]
+
+
+def test_storage_limit(tmp_path):
+    import os
+
+    from saveix.core.config import Settings
+    from saveix.core.models import SnapshotFile
+    from saveix.core.retention import apply_storage_limit
+    from saveix.core.store import ObjectStore
+
+    store = ObjectStore(tmp_path / "b")
+    with Catalog(tmp_path / "c.sqlite3") as catalog:
+        game = catalog.add_game("G")
+        shared, _ = store.put_bytes(b"same in every snapshot")
+        for i in range(4):
+            unique, _ = store.put_bytes(os.urandom(400 * 1024))
+            files = [
+                SnapshotFile(None, "<appdata>/G", "<appdata>/G/a", shared, 1, 0),
+                SnapshotFile(None, "<appdata>/G", "<appdata>/G/b", unique, 1, 0),
+            ]
+            s = catalog.add_snapshot(
+                game, Trigger.MANUAL, f"2026-05-0{i + 1}T00:00:00Z", str(i), files
+            )
+            catalog.set_health(s.id, "ok", [])
+
+        report = apply_storage_limit(catalog, store, Settings(max_storage_mb=1), NOW)
+        assert [r.snapshot.id for r in report.removals] == [1, 2]
+        assert report.warnings == []
+
+        assert apply_storage_limit(catalog, store, Settings(), NOW).removals == []
+
+        catalog.set_pinned(3, True)
+        for i in range(2):
+            unique, _ = store.put_bytes(os.urandom(400 * 1024))
+            files = [SnapshotFile(None, "<appdata>/G", "<appdata>/G/b", unique, 1, 0)]
+            catalog.add_snapshot(game, Trigger.MANUAL, f"2026-05-1{i}T00:00:00Z", f"x{i}", files)
+        report = apply_storage_limit(catalog, store, Settings(max_storage_mb=1), NOW)
+        # #4 stays because it is the newest healthy snapshot.
+        assert [r.snapshot.id for r in report.removals] == [5]
+        assert "remaining snapshots are protected" in report.warnings[0]

@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, tzinfo
 
 from saveix.core.catalog import Catalog
+from saveix.core.config import Settings
 from saveix.core.models import Game, Session, Snapshot, Trigger
+from saveix.core.store import ObjectStore
 from saveix.core.timeline import parse_time
 
 SAFETY_KEEP_DAYS = 30
@@ -178,3 +180,105 @@ def prune(
         for removal in removals:
             catalog.delete_snapshot(removal.snapshot.id)
     return removals
+
+
+@dataclass
+class RetentionReport:
+    removals: list[Removal]
+    warnings: list[str]
+
+
+def limit_count(
+    snapshots: list[Snapshot], already_removed: set[int], max_count: int, now: datetime
+) -> tuple[list[Removal], str | None]:
+    """Remove the oldest unprotected snapshots until a game is within the count limit."""
+    remaining = [s for s in snapshots if s.id not in already_removed]
+    if max_count <= 0 or len(remaining) <= max_count:
+        return [], None
+    keep = protected(remaining, now)
+    excess = len(remaining) - max_count
+    candidates = [s for s in remaining if s.id not in keep][:excess]
+    removals = [Removal(s, f"over the limit of {max_count} snapshots") for s in candidates]
+    warning = None
+    if len(candidates) < excess:
+        warning = (
+            f"{len(remaining) - len(candidates)} snapshots are kept, above the limit of "
+            f"{max_count}, because the rest are protected"
+        )
+    return removals, warning
+
+
+def apply_policy(
+    catalog: Catalog,
+    game: Game,
+    settings: Settings,
+    now: datetime,
+    dry_run: bool = False,
+    tz: tzinfo | None = None,
+) -> RetentionReport:
+    """Apply the retention rules and the per-game snapshot limit to one game."""
+    if settings.keep_all_snapshots:
+        return RetentionReport([], [])
+    snapshots = catalog.snapshots(game)
+    removals = plan_removals(
+        snapshots, catalog.sessions(game), now, settings.recent_sessions_kept, tz
+    )
+    extra, warning = limit_count(
+        snapshots, {r.snapshot.id for r in removals}, settings.max_snapshots_per_game, now
+    )
+    removals += extra
+    if not dry_run:
+        for removal in removals:
+            catalog.delete_snapshot(removal.snapshot.id)
+    return RetentionReport(removals, [f"{game.name}: {warning}"] if warning else [])
+
+
+def apply_storage_limit(
+    catalog: Catalog,
+    store: ObjectStore,
+    settings: Settings,
+    now: datetime,
+    dry_run: bool = False,
+) -> RetentionReport:
+    """Remove the oldest unprotected snapshots of any game until the store fits its limit."""
+    limit = settings.max_storage_mb * 1024 * 1024
+    if settings.keep_all_snapshots or limit <= 0:
+        return RetentionReport([], [])
+
+    sizes: dict[str, int] = {}
+
+    def size_of(digest: str) -> int:
+        if digest not in sizes:
+            try:
+                sizes[digest] = store.stored_size(digest)
+            except OSError:
+                sizes[digest] = 0
+        return sizes[digest]
+
+    uses = catalog.digest_use_counts()
+    used = sum(size_of(d) for d in uses)
+    candidates: list[Snapshot] = []
+    for game in catalog.list_games():
+        snaps = catalog.snapshots(game)
+        keep = protected(snaps, now)
+        candidates += [s for s in snaps if s.id not in keep]
+    candidates.sort(key=lambda s: s.created_at)
+
+    removals = []
+    for snap in candidates:
+        if used <= limit:
+            break
+        for digest in catalog.snapshot_digests(snap.id):
+            uses[digest] -= 1
+            if uses[digest] == 0:
+                used -= size_of(digest)
+        removals.append(Removal(snap, f"backups are over {settings.max_storage_mb} MB"))
+        if not dry_run:
+            catalog.delete_snapshot(snap.id)
+    warnings = []
+    if used > limit:
+        warnings.append(
+            f"Backups use {used // (1024 * 1024)} MB, above the {settings.max_storage_mb} MB "
+            "limit, because the remaining snapshots are protected"
+        )
+    return RetentionReport(removals, warnings)

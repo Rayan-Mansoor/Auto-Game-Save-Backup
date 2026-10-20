@@ -265,6 +265,19 @@ class Catalog:
         self.db.execute(f"UPDATE snapshots SET {column} = ? WHERE id = ?", (value, snapshot_id))
         return self.get_snapshot(snapshot_id)
 
+    def digest_use_counts(self) -> dict[str, int]:
+        """How many snapshots use each stored content."""
+        rows = self.db.execute(
+            "SELECT digest, COUNT(DISTINCT snapshot_id) FROM snapshot_files GROUP BY digest"
+        ).fetchall()
+        return {row[0]: row[1] for row in rows}
+
+    def snapshot_digests(self, snapshot_id: int) -> set[str]:
+        rows = self.db.execute(
+            "SELECT DISTINCT digest FROM snapshot_files WHERE snapshot_id = ?", (snapshot_id,)
+        ).fetchall()
+        return {row[0] for row in rows}
+
     def delete_snapshot(self, snapshot_id: int) -> None:
         self.db.execute("DELETE FROM snapshots WHERE id = ?", (snapshot_id,))
 
