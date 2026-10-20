@@ -17,9 +17,18 @@ dependencies = [
 [project.scripts]
 saveix = "saveix.cli:app"
 
+[project.entry-points."saveix.providers"]
+ludusavi = "saveix.integrations.ludusavi:create"
+
+[project.optional-dependencies]
+ludusavi = [
+    "pyyaml>=6.0.3",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "pyyaml>=6.0.3",
     "ruff>=0.6",
 ]
 
