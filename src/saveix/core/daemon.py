@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -12,6 +13,7 @@ from saveix.core.catalog import Catalog
 from saveix.core.context import context_for
 from saveix.core.models import Game, Trigger
 from saveix.core.sessions import EventKind, SessionDetector
+from saveix.core.watcher import ChangeTracker, FolderWatcher, WatchdogWatcher, watch_game
 
 log = logging.getLogger("saveix")
 
@@ -33,14 +35,20 @@ class Runner:
         detector: SessionDetector | None = None,
         clock: Callable[[], str] = utc_now,
         notify: Callable[[Notice], None] | None = None,
+        quiet_period: float = 10.0,
+        watcher_factory: Callable[[], FolderWatcher] = WatchdogWatcher,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self.catalog = catalog
         self.engine = engine
         self.detector = detector or SessionDetector()
         self.clock = clock
         self.notify = notify or (lambda notice: None)
-        self.active: dict[int, int] = {}
-        """Game ID to the ID of its running session."""
+        self.quiet_period = quiet_period
+        self.watcher_factory = watcher_factory
+        self.monotonic = monotonic
+        self.active: dict[int, _Active] = {}
+        """Games being played, by game ID."""
         self._close_interrupted_sessions()
 
     def _close_interrupted_sessions(self) -> None:
@@ -56,18 +64,41 @@ class Runner:
         games = self.catalog.list_games()
         for event in self.detector.poll(games):
             if event.kind is EventKind.STARTED:
-                session = self.catalog.start_session(event.game, self.clock())
-                self.active[event.game.id] = session.id
-                self._say(event.game, "session started")
+                self._session_started(event.game)
             else:
                 self._session_ended(event.game, event.crashed)
+        now = self.monotonic()
+        for active in list(self.active.values()):
+            if active.tracker.due(now):
+                active.tracker.reset()
+                self.snapshot(active.game, Trigger.CHECKPOINT, active.session_id)
+
+    def _session_started(self, game: Game) -> None:
+        session = self.catalog.start_session(game, self.clock())
+        context = context_for(game)
+        tracker = ChangeTracker(game, context, self.quiet_period)
+        watcher = self.watcher_factory()
+        try:
+            watch_game(game, context, tracker, watcher, self.monotonic)
+        except Exception:
+            log.exception("%s: could not watch save folders", game.name)
+        self.active[game.id] = _Active(game, session.id, tracker, watcher)
+        self._say(game, "session started")
 
     def _session_ended(self, game: Game, crashed: bool) -> None:
-        session_id = self.active.pop(game.id, None)
+        active = self.active.pop(game.id, None)
+        session_id = None
+        if active:
+            active.watcher.stop()
+            session_id = active.session_id
         self.snapshot(game, Trigger.SESSION_END, session_id)
         if session_id is not None:
             self.catalog.end_session(session_id, self.clock(), crashed)
         self._say(game, "session ended after a crash" if crashed else "session ended", crashed)
+
+    def stop_watching(self) -> None:
+        for active in self.active.values():
+            active.watcher.stop()
 
     def snapshot(self, game: Game, trigger: Trigger, session_id: int | None) -> BackupResult | None:
         try:
@@ -93,3 +124,12 @@ class Runner:
             except Exception:
                 log.exception("polling failed")
             stop.wait(interval)
+        self.stop_watching()
+
+
+@dataclass
+class _Active:
+    game: Game
+    session_id: int
+    tracker: ChangeTracker
+    watcher: FolderWatcher

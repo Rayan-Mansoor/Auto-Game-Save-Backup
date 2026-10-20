@@ -19,9 +19,31 @@ def run(
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
     config = Config()
     stop = threading.Event()
+    _lower_priority()
     with open_catalog(config) as catalog:
-        runner = Runner(catalog, BackupEngine(catalog, ObjectStore(config.backup_root)))
+        runner = Runner(
+            catalog,
+            BackupEngine(catalog, ObjectStore(config.backup_root)),
+            quiet_period=config.settings.quiet_period_seconds,
+        )
         try:
             runner.run(stop, interval)
         except KeyboardInterrupt:
             typer.echo("Stopped.")
+
+
+def _lower_priority() -> None:
+    """Keep backups from competing with the game for CPU and disk."""
+    import sys
+
+    import psutil
+
+    me = psutil.Process()
+    try:
+        if sys.platform == "win32":
+            me.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+            me.ionice(psutil.IOPRIO_LOW)
+        else:
+            me.nice(10)
+    except (psutil.Error, OSError, AttributeError):
+        pass

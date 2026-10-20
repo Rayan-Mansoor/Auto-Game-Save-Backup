@@ -8,7 +8,7 @@ from saveix.core.daemon import Runner
 from saveix.core.models import Source, SourceKind, Trigger
 from saveix.core.sessions import SessionDetector
 from saveix.core.store import ObjectStore
-from tests.fakes import FakeClock, FakeProcesses, counting_timestamps
+from tests.fakes import FakeClock, FakeProcesses, FakeWatcher, counting_timestamps
 
 
 @pytest.fixture
@@ -29,7 +29,11 @@ def env(tmp_path, fake_home, context):
         SessionDetector(procs, end_grace_seconds=0, clock=clock),
         clock=stamps,
         notify=notices.append,
+        quiet_period=10,
+        watcher_factory=FakeWatcher,
+        monotonic=clock,
     )
+    runner.test_clock = clock
     yield catalog, game, runner, procs, saves, notices
     catalog.close()
 
@@ -77,3 +81,45 @@ def test_interrupted_sessions_are_closed_on_start(env, tmp_path):
     assert catalog.open_sessions()
     Runner(catalog, runner.engine, runner.detector)
     assert catalog.open_sessions() == []
+
+
+def test_checkpoints_after_writes_settle(env):
+    catalog, game, runner, procs, saves, notices = env
+    clock = runner.test_clock
+    save(saves / "slot.sav", b"start", 1)
+    procs.start("g.exe")
+    runner.poll()
+    watcher = runner.active[game.id].watcher
+    assert watcher.folders == [saves]
+
+    # A burst of writes: nothing until the folder has been quiet for 10 seconds.
+    save(saves / "slot.sav", b"checkpoint 1", 2)
+    watcher.change(saves / "slot.sav.tmp")
+    clock.now = 3
+    watcher.change(saves / "slot.sav")
+    clock.now = 8
+    runner.poll()
+    assert catalog.snapshots(game) == []
+    clock.now = 14
+    runner.poll()
+    [first] = catalog.snapshots(game)
+    assert first.trigger is Trigger.CHECKPOINT
+
+    # Changes outside the save folder are ignored.
+    watcher.change(saves.parent / "Other" / "x")
+    clock.now = 100
+    runner.poll()
+    assert len(catalog.snapshots(game)) == 1
+
+    save(saves / "slot.sav", b"checkpoint 2", 3)
+    watcher.change(saves / "slot.sav")
+    clock.now = 111
+    runner.poll()
+    assert [s.trigger for s in catalog.snapshots(game)] == [Trigger.CHECKPOINT] * 2
+
+    procs.stop_all()
+    runner.poll()
+    assert watcher.stopped
+    # The end-of-session snapshot is skipped because nothing changed since the last checkpoint.
+    assert len(catalog.snapshots(game)) == 2
+    assert all(s.session_id == catalog.sessions(game)[0].id for s in catalog.snapshots(game))
