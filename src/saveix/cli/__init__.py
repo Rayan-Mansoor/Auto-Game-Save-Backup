@@ -11,6 +11,7 @@ from saveix.cli import (
     games,
     identify,
     restore,
+    run,
     scan,
     timeline,
 )
@@ -30,6 +31,7 @@ app.command()(diff.diff)
 app.command()(restore.restore)
 app.command()(identify.identify)
 app.command()(emulators.emulators)
+app.command()(run.run)
 
 
 def _version_callback(value: bool) -> None:

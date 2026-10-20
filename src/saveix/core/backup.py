@@ -65,7 +65,13 @@ class BackupEngine:
         self.clock = clock
         self.retry_delay = retry_delay
 
-    def backup(self, game: Game, context: PathContext, trigger: Trigger) -> BackupResult:
+    def backup(
+        self,
+        game: Game,
+        context: PathContext,
+        trigger: Trigger,
+        session_id: int | None = None,
+    ) -> BackupResult:
         previous = self.catalog.latest_snapshot(game)
         known = {}
         if previous:
@@ -86,7 +92,9 @@ class BackupEngine:
         content = fingerprint(captured)
         if previous and previous.fingerprint == content:
             return result
-        result.snapshot = self.catalog.add_snapshot(game, trigger, self.clock(), content, captured)
+        result.snapshot = self.catalog.add_snapshot(
+            game, trigger, self.clock(), content, captured, session_id
+        )
         return result
 
     def _capture(

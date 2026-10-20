@@ -9,24 +9,9 @@ from saveix.core.sessions import (
     matches_game,
     running_games,
 )
+from tests.fakes import FakeClock, FakeProcesses
 
 runner = CliRunner()
-
-
-class FakeProcesses:
-    def __init__(self):
-        self.current = []
-
-    def processes(self):
-        return list(self.current)
-
-
-class FakeClock:
-    def __init__(self):
-        self.now = 0.0
-
-    def __call__(self):
-        return self.now
 
 
 def game(**kwargs):

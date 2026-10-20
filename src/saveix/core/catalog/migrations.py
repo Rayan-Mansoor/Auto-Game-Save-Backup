@@ -59,6 +59,17 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE games ADD COLUMN executables TEXT NOT NULL DEFAULT '[]';
     """,
+    # 6: play sessions, and which session each snapshot was taken in
+    """
+    CREATE TABLE sessions (
+        id INTEGER PRIMARY KEY,
+        game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        crashed INTEGER NOT NULL DEFAULT 0
+    );
+    ALTER TABLE snapshots ADD COLUMN session_id INTEGER REFERENCES sessions(id) ON DELETE SET NULL;
+    """,
 ]
 
 

@@ -76,3 +76,13 @@ class Snapshot:
     fingerprint: str
     label: str | None = None
     note: str | None = None
+    session_id: int | None = None
+
+
+@dataclass
+class Session:
+    id: int
+    game_id: int
+    started_at: str
+    ended_at: str | None = None
+    crashed: bool = False

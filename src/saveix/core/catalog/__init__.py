@@ -9,6 +9,7 @@ from pathlib import Path
 from saveix.core.catalog import migrations
 from saveix.core.models import (
     Game,
+    Session,
     Snapshot,
     SnapshotFile,
     Source,
@@ -153,13 +154,14 @@ class Catalog:
         created_at: str,
         fingerprint: str,
         files: list[SnapshotFile],
+        session_id: int | None = None,
     ) -> Snapshot:
         self.db.execute("BEGIN")
         try:
             cur = self.db.execute(
                 "INSERT INTO snapshots"
-                " (game_id, created_at, trigger, file_count, total_size, fingerprint)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
+                " (game_id, created_at, trigger, file_count, total_size, fingerprint, session_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     game.id,
                     created_at,
@@ -167,6 +169,7 @@ class Catalog:
                     len(files),
                     sum(f.size for f in files),
                     fingerprint,
+                    session_id,
                 ),
             )
             snapshot_id = cur.lastrowid
@@ -239,6 +242,7 @@ class Catalog:
             fingerprint=row["fingerprint"],
             label=row["label"],
             note=row["note"],
+            session_id=row["session_id"],
         )
 
     def set_label(self, snapshot_id: int, label: str | None) -> Snapshot:
@@ -259,3 +263,44 @@ class Catalog:
             (snapshot.game_id, snapshot.id),
         ).fetchone()
         return self._snapshot(row) if row else None
+
+    # sessions
+
+    def start_session(self, game: Game, started_at: str) -> Session:
+        cur = self.db.execute(
+            "INSERT INTO sessions (game_id, started_at) VALUES (?, ?)", (game.id, started_at)
+        )
+        return self.get_session(cur.lastrowid)
+
+    def end_session(self, session_id: int, ended_at: str, crashed: bool = False) -> Session:
+        self.db.execute(
+            "UPDATE sessions SET ended_at = ?, crashed = ? WHERE id = ?",
+            (ended_at, int(crashed), session_id),
+        )
+        return self.get_session(session_id)
+
+    def get_session(self, session_id: int) -> Session:
+        row = self.db.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
+        if row is None:
+            raise CatalogError(f"No session #{session_id}")
+        return self._session(row)
+
+    def sessions(self, game: Game) -> list[Session]:
+        rows = self.db.execute(
+            "SELECT * FROM sessions WHERE game_id = ? ORDER BY id", (game.id,)
+        ).fetchall()
+        return [self._session(row) for row in rows]
+
+    def open_sessions(self) -> list[Session]:
+        rows = self.db.execute("SELECT * FROM sessions WHERE ended_at IS NULL").fetchall()
+        return [self._session(row) for row in rows]
+
+    @staticmethod
+    def _session(row: sqlite3.Row) -> Session:
+        return Session(
+            id=row["id"],
+            game_id=row["game_id"],
+            started_at=row["started_at"],
+            ended_at=row["ended_at"],
+            crashed=bool(row["crashed"]),
+        )
