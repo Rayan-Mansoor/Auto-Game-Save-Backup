@@ -51,6 +51,8 @@ on their own servers don't need it.
   `<install>/…`, so backups restore on a new PC or after reinstalling.
 - **No admin rights, no hooks into games.** SaveIX only reads the process list and
   your save files. It never touches game memory, so it is safe alongside anti-cheat.
+- **A second copy.** Point `mirror_dir` at a OneDrive or external-drive folder and all
+  backups are copied there after every session.
 - **Tray app, window and command line.** Use whichever you like; they share everything.
 
 ## How it works
@@ -180,6 +182,7 @@ Change settings with `saveix config set KEY VALUE`, and see them all with `savei
 | `max_snapshots_per_game` | `0` | Optional limit per game (0 = none) |
 | `max_storage_mb` | `0` | Optional limit for all backups (0 = none) |
 | `providers` | | Enabled save databases |
+| `mirror_dir` | | A second folder kept as a copy of all backups (`saveix mirror`) |
 
 Pinned, labeled, latest and last-healthy snapshots are kept even when a limit is reached;
 SaveIX warns you instead.
@@ -204,6 +207,7 @@ folder.
 | `run`, `tray`, `gui` | Background watching, tray app, window |
 | `autostart on/off` | Start with Windows |
 | `prune [--dry-run]` | Apply retention rules and free unused space |
+| `mirror [FOLDER]` | Copy all backups to a second folder |
 | `detect`, `identify`, `emulators`, `suggest`, `search` | Find save locations |
 | `providers list / enable / disable / update` | Optional save databases |
 | `config show / set` | Settings |

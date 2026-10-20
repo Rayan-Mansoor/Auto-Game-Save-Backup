@@ -14,6 +14,7 @@ from saveix.cli import (
     emulators,
     games,
     identify,
+    mirror,
     providers,
     prune,
     restore,
@@ -46,6 +47,7 @@ app.command()(run.tray)
 app.command()(run.gui)
 app.command()(autostart.autostart)
 app.command()(prune.prune)
+app.command()(mirror.mirror)
 app.command()(detect.detect)
 app.command()(providers.search)
 app.command()(providers.suggest)

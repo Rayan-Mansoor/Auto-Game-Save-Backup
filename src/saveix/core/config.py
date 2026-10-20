@@ -51,6 +51,8 @@ class Settings:
     """0 means no limit."""
     max_storage_mb: int = 0
     """Limit for the whole backup store; 0 means no limit."""
+    mirror_dir: str = ""
+    """A second folder (for example in OneDrive) kept as a copy of all backups."""
     providers: list[str] = field(default_factory=list)
 
     @classmethod

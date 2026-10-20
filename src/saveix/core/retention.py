@@ -9,6 +9,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, tzinfo
+from pathlib import Path
 
 from saveix.core.catalog import Catalog
 from saveix.core.config import Config, Settings
@@ -295,6 +296,14 @@ def retention_hook(config: Config, catalog: Catalog) -> Callable[[Game], list[st
         report = apply_policy(catalog, game, config.settings, now)
         storage = apply_storage_limit(catalog, store, config.settings, now)
         collect_garbage(catalog, store)
-        return report.warnings + storage.warnings
+        warnings = report.warnings + storage.warnings
+        if config.settings.mirror_dir:
+            from saveix.core.mirror import mirror
+
+            try:
+                mirror(catalog, store, Path(config.settings.mirror_dir).expanduser())
+            except OSError as exc:
+                warnings.append(f"Could not update the backup mirror: {exc}")
+        return warnings
 
     return run
