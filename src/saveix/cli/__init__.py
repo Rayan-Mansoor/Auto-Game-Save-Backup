@@ -3,7 +3,7 @@
 import typer
 
 from saveix import __version__
-from saveix.cli import backup, config_cmd, games, scan, timeline
+from saveix.cli import backup, config_cmd, diff, games, scan, timeline
 
 app = typer.Typer(
     help="Automatic, versioned backups of local game save files.", no_args_is_help=True
@@ -16,6 +16,7 @@ app.command()(backup.backup)
 app.command()(timeline.timeline)
 app.command()(timeline.label)
 app.command()(timeline.note)
+app.command()(diff.diff)
 
 
 def _version_callback(value: bool) -> None:

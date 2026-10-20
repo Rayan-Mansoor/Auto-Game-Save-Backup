@@ -229,3 +229,10 @@ class Catalog:
         self.get_snapshot(snapshot_id)
         self.db.execute(f"UPDATE snapshots SET {column} = ? WHERE id = ?", (value, snapshot_id))
         return self.get_snapshot(snapshot_id)
+
+    def previous_snapshot(self, snapshot: Snapshot) -> Snapshot | None:
+        row = self.db.execute(
+            "SELECT * FROM snapshots WHERE game_id = ? AND id < ? ORDER BY id DESC LIMIT 1",
+            (snapshot.game_id, snapshot.id),
+        ).fetchone()
+        return self._snapshot(row) if row else None
