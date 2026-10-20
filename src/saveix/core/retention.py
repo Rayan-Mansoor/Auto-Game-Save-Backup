@@ -6,11 +6,12 @@ This module decides; it never deletes anything itself.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, tzinfo
+from datetime import UTC, date, datetime, timedelta, tzinfo
 
 from saveix.core.catalog import Catalog
-from saveix.core.config import Settings
+from saveix.core.config import Config, Settings
 from saveix.core.models import Game, Session, Snapshot, Trigger
 from saveix.core.store import ObjectStore
 from saveix.core.timeline import parse_time
@@ -282,3 +283,18 @@ def apply_storage_limit(
             "limit, because the remaining snapshots are protected"
         )
     return RetentionReport(removals, warnings)
+
+
+def retention_hook(config: Config, catalog: Catalog) -> Callable[[Game], list[str]]:
+    """What the runner calls after each session; returns warnings to show the user."""
+    from saveix.core.gc import collect_garbage
+
+    def run(game: Game) -> list[str]:
+        now = datetime.now(UTC)
+        store = ObjectStore(config.backup_root)
+        report = apply_policy(catalog, game, config.settings, now)
+        storage = apply_storage_limit(catalog, store, config.settings, now)
+        collect_garbage(catalog, store)
+        return report.warnings + storage.warnings
+
+    return run

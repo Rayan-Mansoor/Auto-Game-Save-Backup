@@ -3,7 +3,7 @@
 import typer
 
 from saveix.cli.common import open_catalog
-from saveix.cli.scan import human_size
+from saveix.core.text import human_size
 from saveix.core.timeline import timeline as build_timeline
 
 HEALTH_MARKS = {"ok": "✓", "suspicious": "⚠", None: " "}

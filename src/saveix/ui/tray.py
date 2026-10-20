@@ -48,7 +48,7 @@ class RunnerThread(QThread):
         self.paused = threading.Event()
 
     def run(self) -> None:
-        from saveix.cli.prune import retention_hook
+        from saveix.core.retention import retention_hook
 
         catalog = Catalog(self.config.catalog_path)
         try:

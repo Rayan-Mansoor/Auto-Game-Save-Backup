@@ -93,11 +93,11 @@ def suggest(
 ) -> None:
     """Set up a game from provider data: suggest save locations and add the ones you confirm."""
     from saveix.cli.common import open_catalog
-    from saveix.cli.scan import human_size
     from saveix.core.catalog import CatalogError
     from saveix.core.context import context_for
     from saveix.core.emulators import load_emulators
     from saveix.core.suggestions import apply_details, check_candidates
+    from saveix.core.text import human_size
 
     config = Config()
     providers = enabled_providers(config)

@@ -3,12 +3,12 @@
 import typer
 
 from saveix.cli.common import fail, open_catalog
-from saveix.cli.scan import human_size
 from saveix.core.backup import BackupEngine, NothingToBackUpError
 from saveix.core.config import Config
 from saveix.core.context import context_for
 from saveix.core.models import Trigger
 from saveix.core.store import ObjectStore
+from saveix.core.text import human_size
 
 
 def backup(game: str) -> None:

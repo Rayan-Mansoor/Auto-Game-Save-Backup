@@ -35,6 +35,7 @@ from saveix.core.models import Trigger as SnapshotTrigger
 from saveix.core.sources import SourceError, make_source
 from saveix.core.store import ObjectStore
 from saveix.ui.dialogs import DetectDialog, ProviderSearchDialog
+from saveix.ui.timeline_view import TimelineTab
 
 
 def _button(text: str, handler) -> QPushButton:
@@ -103,6 +104,10 @@ class LibraryWindow(QMainWindow):
         right.addLayout(game_row)
 
         self.tabs = QTabWidget()
+        self.timeline = TimelineTab(
+            self.catalog, self.store, self.current_game, self.error, self.message
+        )
+        self.tabs.addTab(self.timeline, "Timeline")
         self.tabs.addTab(library_tab, "Save locations")
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
@@ -149,6 +154,10 @@ class LibraryWindow(QMainWindow):
         self.show_game()
 
     def show_game(self) -> None:
+        self._show_game()
+        self.timeline.refresh()
+
+    def _show_game(self) -> None:
         game = self.current_game()
         self.sources.setRowCount(0)
         if game is None:

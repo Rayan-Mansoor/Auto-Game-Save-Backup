@@ -6,10 +6,10 @@ import threading
 import typer
 
 from saveix.cli.common import open_catalog
-from saveix.cli.prune import retention_hook
 from saveix.core.backup import BackupEngine
 from saveix.core.config import Config
 from saveix.core.daemon import Runner
+from saveix.core.retention import retention_hook
 from saveix.core.store import ObjectStore
 
 

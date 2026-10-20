@@ -5,27 +5,11 @@ from datetime import UTC, datetime
 import typer
 
 from saveix.cli.common import open_catalog
-from saveix.cli.scan import human_size
-from saveix.core.catalog import Catalog
 from saveix.core.config import Config
 from saveix.core.gc import collect_garbage
-from saveix.core.models import Game
 from saveix.core.retention import apply_policy, apply_storage_limit
 from saveix.core.store import ObjectStore
-
-
-def retention_hook(config: Config, catalog: Catalog):
-    """Called by the runner after each session; returns warnings to show the user."""
-
-    def run(game: Game) -> list[str]:
-        now = datetime.now(UTC)
-        store = ObjectStore(config.backup_root)
-        report = apply_policy(catalog, game, config.settings, now)
-        storage = apply_storage_limit(catalog, store, config.settings, now)
-        collect_garbage(catalog, store)
-        return report.warnings + storage.warnings
-
-    return run
+from saveix.core.text import human_size
 
 
 def prune(

@@ -3,8 +3,8 @@
 import typer
 
 from saveix.cli.common import fail, open_catalog
-from saveix.cli.scan import human_size
 from saveix.core.diff import Change, FileChange, diff_files
+from saveix.core.text import human_size
 
 SYMBOLS = {Change.ADDED: "+", Change.REMOVED: "-", Change.MODIFIED: "~"}
 
