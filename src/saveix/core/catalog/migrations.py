@@ -50,6 +50,11 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE games ADD COLUMN install_dir TEXT;
     """,
+    # 4: store IDs read from the game's own files
+    """
+    ALTER TABLE games ADD COLUMN steam_app_id INTEGER;
+    ALTER TABLE games ADD COLUMN gog_id INTEGER;
+    """,
 ]
 
 

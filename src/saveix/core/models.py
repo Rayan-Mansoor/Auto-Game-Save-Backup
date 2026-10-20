@@ -41,6 +41,8 @@ class Game:
     id: int | None = None
     install_dir: str | None = None
     """The game's install folder on this PC; resolves ``<install>`` in source paths."""
+    steam_app_id: int | None = None
+    gog_id: int | None = None
     sources: list[Source] = field(default_factory=list)
 
 

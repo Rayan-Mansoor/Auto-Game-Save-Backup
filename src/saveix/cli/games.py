@@ -57,6 +57,10 @@ def game_show(name: str) -> None:
     typer.echo(game.name)
     if game.install_dir:
         typer.echo(f"  installed in {game.install_dir}")
+    if game.steam_app_id:
+        typer.echo(f"  Steam app ID {game.steam_app_id}")
+    if game.gog_id:
+        typer.echo(f"  GOG ID {game.gog_id}")
     print_sources(game)
 
 

@@ -70,11 +70,22 @@ class Catalog:
         self._set_game_column(game, "install_dir", install_dir)
         game.install_dir = install_dir
 
+    def set_store_ids(self, game: Game, steam_app_id: int | None, gog_id: int | None) -> None:
+        self._set_game_column(game, "steam_app_id", steam_app_id)
+        self._set_game_column(game, "gog_id", gog_id)
+        game.steam_app_id, game.gog_id = steam_app_id, gog_id
+
     def _set_game_column(self, game: Game, column: str, value: object) -> None:
         self.db.execute(f"UPDATE games SET {column} = ? WHERE id = ?", (value, game.id))
 
     def _game(self, row: sqlite3.Row) -> Game:
-        game = Game(name=row["name"], id=row["id"], install_dir=row["install_dir"])
+        game = Game(
+            name=row["name"],
+            id=row["id"],
+            install_dir=row["install_dir"],
+            steam_app_id=row["steam_app_id"],
+            gog_id=row["gog_id"],
+        )
         game.sources = self.sources_for(game.id)
         return game
 
