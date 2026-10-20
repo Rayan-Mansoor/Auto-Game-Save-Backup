@@ -7,6 +7,7 @@ Save locations are stored as templates with saveix's own placeholders, such as
 
 from __future__ import annotations
 
+import glob
 import os
 import re
 import sys
@@ -165,9 +166,15 @@ class PathContext:
         values[USERID] = self.user_id or "*"
         return values
 
-    def expand(self, template: str) -> str:
-        """Replace placeholders with real locations. The result may still be a glob."""
+    def expand(self, template: str, escape: bool = False) -> str:
+        """Replace placeholders with real locations. The result may still be a glob.
+
+        With ``escape``, glob characters in the substituted folders are escaped, so the
+        result can be passed to ``glob`` while only the template's own wildcards match.
+        """
         values = self.values()
+        if escape:
+            values = {k: v if k == USERID else glob.escape(v) for k, v in values.items()}
 
         def replace(match: re.Match[str]) -> str:
             name = match.group(0)

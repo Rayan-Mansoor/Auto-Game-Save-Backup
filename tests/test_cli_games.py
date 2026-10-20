@@ -2,22 +2,14 @@ import pytest
 from typer.testing import CliRunner
 
 from saveix.cli import app
-from saveix.core.paths import FallbackFolders
 from saveix.core.sources import breadth_problem
 
 runner = CliRunner()
 
 
 @pytest.fixture(autouse=True)
-def fake_home(tmp_path, monkeypatch):
-    """Point placeholder resolution at a fake Windows-style home folder."""
-    home = tmp_path / "home"
-    folders = FallbackFolders(home)
-    monkeypatch.setattr("saveix.core.paths.system_folders", lambda: folders)
-    for folder in folders.known_folders().values():
-        if str(folder).startswith(str(home)):
-            folder.mkdir(parents=True, exist_ok=True)
-    return home
+def _home(fake_home):
+    return fake_home
 
 
 def run(*args):
