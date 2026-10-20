@@ -1,5 +1,7 @@
 """Command-line interface for saveix."""
 
+import sys
+
 import typer
 
 from saveix import __version__
@@ -27,6 +29,7 @@ app.command()(backup.backup)
 app.command()(timeline.timeline)
 app.command()(timeline.label)
 app.command()(timeline.note)
+app.command()(timeline.check)
 app.command()(diff.diff)
 app.command()(restore.restore)
 app.command()(identify.identify)
@@ -52,3 +55,15 @@ def main(
     ),
 ) -> None:
     """Automatic, versioned backups of local game save files."""
+    _safe_output()
+
+
+def _safe_output() -> None:
+    """Never crash on characters the output can't show.
+
+    On Windows, output that is not a console window (a file, a pipe, Git Bash) uses the
+    ANSI code page, which has no ✓ or ⚠; those are replaced instead of raising.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")

@@ -101,7 +101,7 @@ class Runner:
         if active:
             active.watcher.stop()
             session_id = active.session_id
-        self.snapshot(game, Trigger.SESSION_END, session_id)
+        self.snapshot(game, Trigger.SESSION_END, session_id, crashed)
         if session_id is not None:
             self.catalog.end_session(session_id, self.clock(), crashed)
         self._say(game, "session ended after a crash" if crashed else "session ended", crashed)
@@ -110,9 +110,11 @@ class Runner:
         for active in self.active.values():
             active.watcher.stop()
 
-    def snapshot(self, game: Game, trigger: Trigger, session_id: int | None) -> BackupResult | None:
+    def snapshot(
+        self, game: Game, trigger: Trigger, session_id: int | None, crashed: bool = False
+    ) -> BackupResult | None:
         try:
-            result = self.engine.backup(game, context_for(game), trigger, session_id)
+            result = self.engine.backup(game, context_for(game), trigger, session_id, crashed)
         except NothingToBackUpError as exc:
             self._say(game, str(exc), warning=True)
             return None
@@ -122,8 +124,12 @@ class Runner:
             return None
         for path, reason in result.skipped:
             self._say(game, f"skipped {path}: {reason}", warning=True)
-        if result.snapshot:
-            self._say(game, f"saved snapshot #{result.snapshot.id}")
+        snap = result.snapshot
+        if snap and snap.health == "suspicious":
+            problems = "; ".join(snap.health_notes)
+            self._say(game, f"snapshot #{snap.id} looks damaged: {problems}", warning=True)
+        elif snap:
+            self._say(game, f"saved snapshot #{snap.id}")
         return result
 
     def run(self, stop: threading.Event, interval: float = 5.0) -> None:

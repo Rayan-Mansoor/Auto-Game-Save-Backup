@@ -28,7 +28,8 @@ def test_timeline_is_newest_first_with_auto_labels(fake_home, tmp_path):
     result = runner.invoke(app, ["timeline", "G"])
     assert result.exit_code == 0, result.output
     lines = result.output.splitlines()
-    assert [line.split()[0] for line in lines] == ["#3", "#2", "#1"]
+    assert [line.split()[1] for line in lines] == ["#3", "#2", "#1"]
+    assert all(line.startswith("✓") for line in lines)
     assert all("Manual backup" in line for line in lines)
 
     assert len(runner.invoke(app, ["timeline", "G", "-n", "1"]).output.splitlines()) == 1

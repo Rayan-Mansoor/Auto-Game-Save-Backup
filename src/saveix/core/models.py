@@ -79,6 +79,9 @@ class Snapshot:
     label: str | None = None
     note: str | None = None
     session_id: int | None = None
+    health: str | None = None
+    """"ok" or "suspicious" once checked."""
+    health_notes: list[str] = field(default_factory=list)
 
 
 @dataclass

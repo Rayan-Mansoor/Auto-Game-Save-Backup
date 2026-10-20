@@ -14,6 +14,7 @@ from saveix.core.paths import PathContext
 from saveix.core.sources.registry import RegistryBackend, system_registry
 from saveix.core.sources.resolve import FoundFile, scan_game
 from saveix.core.store import ObjectStore
+from saveix.core.validate import Health, check_snapshot
 
 READ_ATTEMPTS = 3
 
@@ -71,6 +72,7 @@ class BackupEngine:
         context: PathContext,
         trigger: Trigger,
         session_id: int | None = None,
+        crashed: bool = False,
     ) -> BackupResult:
         previous = self.catalog.latest_snapshot(game)
         known = {}
@@ -92,10 +94,24 @@ class BackupEngine:
         content = fingerprint(captured)
         if previous and previous.fingerprint == content:
             return result
-        result.snapshot = self.catalog.add_snapshot(
+        snapshot = self.catalog.add_snapshot(
             game, trigger, self.clock(), content, captured, session_id
         )
+        result.snapshot = self.check(snapshot, crashed)
         return result
+
+    def check(self, snapshot: Snapshot, crashed: bool = False) -> Snapshot:
+        """Run the health checks on a snapshot and record the result."""
+        previous = self.catalog.previous_snapshot(snapshot)
+        findings = check_snapshot(
+            self.catalog.snapshot_files(snapshot.id),
+            self.catalog.snapshot_files(previous.id) if previous else None,
+            self.store.read_bytes,
+            crashed=crashed,
+        )
+        notes = [f"{f.template}: {f.message}" if f.template else f.message for f in findings]
+        health = Health.SUSPICIOUS if findings else Health.OK
+        return self.catalog.set_health(snapshot.id, health.value, notes)
 
     def _capture(
         self,

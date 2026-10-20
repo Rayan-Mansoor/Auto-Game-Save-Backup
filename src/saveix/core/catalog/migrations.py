@@ -74,6 +74,11 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE games ADD COLUMN checkpoint_interval_minutes INTEGER;
     """,
+    # 8: health check results for each snapshot
+    """
+    ALTER TABLE snapshots ADD COLUMN health TEXT;
+    ALTER TABLE snapshots ADD COLUMN health_notes TEXT NOT NULL DEFAULT '[]';
+    """,
 ]
 
 
