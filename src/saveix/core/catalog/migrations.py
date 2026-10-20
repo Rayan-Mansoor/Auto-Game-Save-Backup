@@ -55,6 +55,10 @@ MIGRATIONS: list[str] = [
     ALTER TABLE games ADD COLUMN steam_app_id INTEGER;
     ALTER TABLE games ADD COLUMN gog_id INTEGER;
     """,
+    # 5: executables that mean the game is running
+    """
+    ALTER TABLE games ADD COLUMN executables TEXT NOT NULL DEFAULT '[]';
+    """,
 ]
 
 

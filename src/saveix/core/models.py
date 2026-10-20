@@ -43,6 +43,8 @@ class Game:
     """The game's install folder on this PC; resolves ``<install>`` in source paths."""
     steam_app_id: int | None = None
     gog_id: int | None = None
+    executables: list[str] = field(default_factory=list)
+    """Executable names or full paths whose processes mean the game is running."""
     sources: list[Source] = field(default_factory=list)
 
 

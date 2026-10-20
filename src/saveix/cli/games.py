@@ -61,6 +61,8 @@ def game_show(name: str) -> None:
         typer.echo(f"  Steam app ID {game.steam_app_id}")
     if game.gog_id:
         typer.echo(f"  GOG ID {game.gog_id}")
+    if game.executables:
+        typer.echo(f"  executables: {', '.join(game.executables)}")
     print_sources(game)
 
 
@@ -82,6 +84,46 @@ def game_set_install(
     typer.echo(
         f"{target.name} is installed in {install}." if install else "Install folder cleared."
     )
+
+
+@game_app.command("add-exe")
+def game_add_exe(
+    name: str,
+    executable: str = typer.Argument(..., help="Executable name (Game.exe) or full path."),
+) -> None:
+    """Tell saveix which program means the game is running."""
+    with open_catalog() as catalog:
+        target = catalog.get_game(name)
+        if executable.casefold() in (e.casefold() for e in target.executables):
+            fail(f"{executable} is already listed for {target.name}")
+        catalog.set_executables(target, [*target.executables, executable])
+    typer.echo(f"{target.name} now runs as: {', '.join(target.executables)}")
+
+
+@game_app.command("remove-exe")
+def game_remove_exe(name: str, executable: str) -> None:
+    """Stop treating a program as the game."""
+    with open_catalog() as catalog:
+        target = catalog.get_game(name)
+        remaining = [e for e in target.executables if e.casefold() != executable.casefold()]
+        if len(remaining) == len(target.executables):
+            fail(f"{executable} is not listed for {target.name}")
+        catalog.set_executables(target, remaining)
+    typer.echo(f"Removed {executable} from {target.name}.")
+
+
+@game_app.command("running")
+def game_running() -> None:
+    """Show which games in the library are running right now."""
+    from saveix.core.sessions import running_games
+
+    with open_catalog() as catalog:
+        games = catalog.list_games()
+    running = running_games(games)
+    if not running:
+        typer.echo("None of your games are running.")
+    for game in running:
+        typer.echo(f"{game.name} is running.")
 
 
 @game_app.command("remove")

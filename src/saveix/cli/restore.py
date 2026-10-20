@@ -7,6 +7,7 @@ from saveix.core.backup import BackupEngine
 from saveix.core.config import Config
 from saveix.core.context import context_for
 from saveix.core.restore import Action, Restorer
+from saveix.core.sessions import running_games
 from saveix.core.store import CorruptObjectError, ObjectStore
 
 
@@ -51,6 +52,8 @@ def restore(
             typer.echo(f"  delete {item.template}")
         if dry_run:
             return
+        if running_games([target]):
+            fail(f"{target.name} is running; close it before restoring its saves.")
         if not yes:
             typer.confirm("Continue? Your current saves are backed up first.", abort=True)
         try:

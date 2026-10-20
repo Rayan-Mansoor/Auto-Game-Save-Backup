@@ -165,3 +165,17 @@ def test_restore_unknown_source(env, context):
     first = snap(**{"slot.sav": (b"1", 1)})
     with pytest.raises(CatalogError):
         restorer.plan(game, first, context, only_sources={99})
+
+
+def test_restore_refused_while_game_runs(saves, monkeypatch):
+    write(saves / "slot.sav", b"stage 1", 1)
+    runner.invoke(app, ["game", "add", "G"])
+    runner.invoke(app, ["source", "add", "G", str(saves)])
+    runner.invoke(app, ["backup", "G"])
+    write(saves / "slot.sav", b"stage 2", 2)
+    monkeypatch.setattr("saveix.cli.restore.running_games", lambda games: games)
+
+    result = runner.invoke(app, ["restore", "G", "--yes"])
+    assert result.exit_code == 1
+    assert "is running" in result.output
+    assert (saves / "slot.sav").read_bytes() == b"stage 2"

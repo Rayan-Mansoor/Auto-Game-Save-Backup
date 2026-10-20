@@ -75,6 +75,10 @@ class Catalog:
         self._set_game_column(game, "gog_id", gog_id)
         game.steam_app_id, game.gog_id = steam_app_id, gog_id
 
+    def set_executables(self, game: Game, executables: list[str]) -> None:
+        self._set_game_column(game, "executables", json.dumps(executables))
+        game.executables = list(executables)
+
     def _set_game_column(self, game: Game, column: str, value: object) -> None:
         self.db.execute(f"UPDATE games SET {column} = ? WHERE id = ?", (value, game.id))
 
@@ -85,6 +89,7 @@ class Catalog:
             install_dir=row["install_dir"],
             steam_app_id=row["steam_app_id"],
             gog_id=row["gog_id"],
+            executables=json.loads(row["executables"]),
         )
         game.sources = self.sources_for(game.id)
         return game
