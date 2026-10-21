@@ -100,6 +100,9 @@ class Runner:
             log.exception("%s: could not watch save folders", game.name)
         self.active[game.id] = _Active(game, session.id, tracker, watcher)
         self._say(game, "session started")
+        # Keep the state from before playing, in case the first save goes wrong.
+        # Nothing is stored if it matches the last snapshot or the game has no saves yet.
+        self.snapshot(game, Trigger.SESSION_START, session.id, quiet_if_empty=True)
 
     def _session_ended(self, game: Game, crashed: bool) -> None:
         active = self.active.pop(game.id, None)
@@ -127,12 +130,18 @@ class Runner:
             active.watcher.stop()
 
     def snapshot(
-        self, game: Game, trigger: Trigger, session_id: int | None, crashed: bool = False
+        self,
+        game: Game,
+        trigger: Trigger,
+        session_id: int | None,
+        crashed: bool = False,
+        quiet_if_empty: bool = False,
     ) -> BackupResult | None:
         try:
             result = self.engine.backup(game, context_for(game), trigger, session_id, crashed)
         except NothingToBackUpError as exc:
-            self._say(game, str(exc), warning=True)
+            if not quiet_if_empty:
+                self._say(game, str(exc), warning=True)
             return None
         except Exception:
             log.exception("%s: backup failed", game.name)

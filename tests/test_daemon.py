@@ -44,6 +44,11 @@ def save(path, data, second):
     os.utime(path, ns=(second * 10**9, second * 10**9))
 
 
+def played(catalog, game):
+    """Snapshots taken during play, leaving out the one from the start of the session."""
+    return [s for s in catalog.snapshots(game) if s.trigger is not Trigger.SESSION_START]
+
+
 def test_snapshot_when_session_ends(env):
     catalog, game, runner, procs, saves, notices = env
     save(saves / "slot.sav", b"before", 1)
@@ -56,22 +61,45 @@ def test_snapshot_when_session_ends(env):
 
     [session] = catalog.sessions(game)
     assert session.ended_at and not session.crashed
-    [snap] = catalog.snapshots(game)
-    assert snap.trigger is Trigger.SESSION_END and snap.session_id == session.id
+    start, end = catalog.snapshots(game)
+    assert start.trigger is Trigger.SESSION_START and end.trigger is Trigger.SESSION_END
+    assert {start.session_id, end.session_id} == {session.id}
+    before = catalog.snapshot_files(start.id)[0]
+    assert engine_read(runner, before.digest) == b"before"
     assert [n.message for n in notices] == [
         "session started",
-        f"saved snapshot #{snap.id}",
-        "session ended; 1 snapshot saved",
+        f"saved snapshot #{start.id}",
+        f"saved snapshot #{end.id}",
+        "session ended; 2 snapshots saved",
     ]
-    assert [n.important for n in notices] == [False, False, True]
+    assert [n.important for n in notices] == [False, False, False, True]
+
+
+def engine_read(runner, digest):
+    return runner.engine.store.read_bytes(digest)
+
+
+def test_session_start_is_not_stored_twice(env):
+    catalog, game, runner, procs, saves, notices = env
+    save(saves / "slot.sav", b"same", 1)
+    for _ in range(2):
+        procs.start("g.exe")
+        runner.poll()
+        procs.stop_all()
+        runner.poll()
+    # Nothing changed while playing, so only the first session start was stored.
+    assert [s.trigger for s in catalog.snapshots(game)] == [Trigger.SESSION_START]
 
 
 def test_session_without_saves_warns(env):
     catalog, game, runner, procs, saves, notices = env
     procs.start("g.exe")
     runner.poll()
+    # A game with no saves yet is not a problem when the session starts...
+    assert not any(n.warning for n in notices)
     procs.stop_all()
     runner.poll()
+    # ...but still having none when it ends is worth a warning.
     assert any(n.warning and "No save files" in n.message for n in notices)
     assert catalog.sessions(game)[0].ended_at
 
@@ -101,29 +129,29 @@ def test_checkpoints_after_writes_settle(env):
     watcher.change(saves / "slot.sav")
     clock.now = 8
     runner.poll()
-    assert catalog.snapshots(game) == []
+    assert played(catalog, game) == []
     clock.now = 14
     runner.poll()
-    [first] = catalog.snapshots(game)
+    [first] = played(catalog, game)
     assert first.trigger is Trigger.CHECKPOINT
 
     # Changes outside the save folder are ignored.
     watcher.change(saves.parent / "Other" / "x")
     clock.now = 100
     runner.poll()
-    assert len(catalog.snapshots(game)) == 1
+    assert len(played(catalog, game)) == 1
 
     save(saves / "slot.sav", b"checkpoint 2", 3)
     watcher.change(saves / "slot.sav")
     clock.now = 111
     runner.poll()
-    assert [s.trigger for s in catalog.snapshots(game)] == [Trigger.CHECKPOINT] * 2
+    assert [s.trigger for s in played(catalog, game)] == [Trigger.CHECKPOINT] * 2
 
     procs.stop_all()
     runner.poll()
     assert watcher.stopped
     # The end-of-session snapshot is skipped because nothing changed since the last checkpoint.
-    assert len(catalog.snapshots(game)) == 2
+    assert len(played(catalog, game)) == 2
     assert all(s.session_id == catalog.sessions(game)[0].id for s in catalog.snapshots(game))
 
 
@@ -146,16 +174,16 @@ def test_checkpoint_frequency_is_limited(env):
     autosave(b"1", 0)
     autosave(b"2", 60)
     autosave(b"3", 120)
-    assert len(catalog.snapshots(game)) == 1
+    assert len(played(catalog, game)) == 1
     # The waiting save is taken once ten minutes have passed since the last checkpoint.
     clock.now = 611
     runner.poll()
-    assert len(catalog.snapshots(game)) == 2
+    assert len(played(catalog, game)) == 2
 
     catalog.set_checkpoint_interval(game, 0)
     runner.active[game.id].game.checkpoint_interval_minutes = 0
     autosave(b"4", 700)
-    assert len(catalog.snapshots(game)) == 3
+    assert len(played(catalog, game)) == 3
 
 
 def test_config_only_changes_do_not_trigger_checkpoints(env, fake_home):
@@ -175,12 +203,12 @@ def test_config_only_changes_do_not_trigger_checkpoints(env, fake_home):
     watcher.change(ini)
     clock.now = 100
     runner.poll()
-    assert catalog.snapshots(game) == []
+    assert played(catalog, game) == []
 
     save(saves / "slot.sav", b"progress", 3)
     watcher.change(saves / "slot.sav")
     clock.now = 200
     runner.poll()
-    [snap] = catalog.snapshots(game)
+    [snap] = played(catalog, game)
     files = {f.template: f for f in catalog.snapshot_files(snap.id)}
     assert "<documents>/G.ini" in files

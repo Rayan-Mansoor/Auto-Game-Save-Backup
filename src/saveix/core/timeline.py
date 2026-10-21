@@ -10,6 +10,7 @@ from saveix.core.models import Game, Snapshot, Trigger
 
 AUTO_LABELS = {
     Trigger.MANUAL: "Manual backup",
+    Trigger.SESSION_START: "Start of session",
     Trigger.CHECKPOINT: "Checkpoint",
     Trigger.SESSION_END: "End of session",
     Trigger.SAFETY: "Before restore",

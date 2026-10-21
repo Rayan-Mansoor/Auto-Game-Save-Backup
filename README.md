@@ -31,8 +31,9 @@ on their own servers don't need it.
 
 ## Features
 
-- **Automatic while you play.** SaveIX spots the game starting and snapshots your saves
-  each time the game saves (once the writing has settled) and again when you quit.
+- **Automatic while you play.** SaveIX spots the game starting, snapshots your saves as
+  they are, then again each time the game saves (once the writing has settled) and when
+  you quit.
   It even notices when a game crashes.
 - **A timeline, not just "the latest backup".** Every snapshot is restorable. Name the
   important ones ("Before the final boss"), add notes and pin them so they are kept forever.
@@ -59,7 +60,7 @@ on their own servers don't need it.
 
 ```mermaid
 flowchart LR
-    A[Game starts] --> B[Watch save folders]
+    A[Game starts] --> S[Snapshot current saves] --> B[Watch save folders]
     B -->|game saves, writes settle| C[Checkpoint snapshot]
     C --> B
     B -->|game exits| D[End-of-session snapshot]
@@ -73,14 +74,16 @@ flowchart LR
    location, with optional include and exclude filters.
 2. **SaveIX watches for the game's process.** It recognises the game by its executable
    name, or by any program started from the game's install folder.
-3. **During a session,** save folders are watched. When the game writes its save, SaveIX
+3. **When the game starts,** its saves are snapshotted as they are, so the state from
+   before you played is always kept (unless it is already the latest snapshot).
+4. **During a session,** save folders are watched. When the game writes its save, SaveIX
    waits until the writing has stopped (10 seconds by default) and takes a checkpoint. It
    takes at most one checkpoint every 10 minutes per game; anything newer is caught by the
    next one or by the snapshot taken when you quit. Changes to config files never trigger a
    snapshot by themselves.
-4. **Snapshots are content-addressed:** each distinct file is stored once, compressed with
+5. **Snapshots are content-addressed:** each distinct file is stored once, compressed with
    zstd, and verified when restored. If nothing changed, no snapshot is stored.
-5. **History is thinned after each session:**
+6. **History is thinned after each session:**
    - The last 3 sessions keep every checkpoint.
    - Older sessions keep only their final state: one snapshot per day for the 30 most
      recent days you played, then one per week.

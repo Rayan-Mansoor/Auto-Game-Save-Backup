@@ -54,6 +54,7 @@ class Game:
 
 class Trigger(StrEnum):
     MANUAL = "manual"
+    SESSION_START = "session_start"
     CHECKPOINT = "checkpoint"
     SESSION_END = "session_end"
     SAFETY = "safety"
